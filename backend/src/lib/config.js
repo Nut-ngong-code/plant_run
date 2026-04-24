@@ -10,6 +10,7 @@ const num = (key, fallback) => {
 
 export const config = {
   port: num("PORT", 3000),
+  frontendUrl: process.env.FRONTEND_URL ?? "http://localhost:5173",
   points: {
     perKm: num("POINTS_PER_KM", 10),
     costWater: num("POINTS_COST_WATER", 15),

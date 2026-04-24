@@ -68,6 +68,25 @@ deviceRouter.post("/:deviceId/command/:commandId/ack", async (req, res) => {
   res.json({ id: updated.id, status: updated.status });
 });
 
+// GET /api/device/:deviceId/soil-history?limit=200
+// ประวัติความชื้น สำหรับกราฟในหน้า stats
+deviceRouter.get("/:deviceId/soil-history", async (req, res) => {
+  const { deviceId } = req.params;
+  const limit = Math.min(Number(req.query.limit ?? 200), 1000);
+
+  const device = await prisma.device.findUnique({ where: { deviceId } });
+  if (!device) throw new HttpError(404, "Device not registered", { deviceId });
+
+  const logs = await prisma.soilLog.findMany({
+    where: { deviceId: device.id },
+    orderBy: { recordedAt: "desc" },
+    take: limit,
+    select: { id: true, moisturePercent: true, recordedAt: true },
+  });
+
+  res.json(logs.reverse()); // ส่งกลับเรียงตามเวลาน้อย → มาก (พร้อม plot)
+});
+
 // POST /api/device (สำหรับผูกอุปกรณ์กับผู้ใช้)
 const registerBody = z.object({
   userId: z.number().int().positive(),

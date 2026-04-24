@@ -70,8 +70,11 @@ stravaRouter.get("/callback", async (req, res) => {
     },
   });
 
-  // ช่วงพัฒนาตอบกลับเป็น JSON ไปก่อน; ภายหลังให้ redirect ไป frontend พร้อม session/JWT
-  res.json({ userId: user.id, stravaId: user.stravaId, displayName: user.displayName });
+  // Redirect กลับไปที่ frontend พร้อม userId ใน query string
+  // (เวอร์ชัน prototype ไม่มี JWT — frontend เก็บ userId ใน localStorage)
+  const redirectUrl = new URL("/auth/callback", config.frontendUrl);
+  redirectUrl.searchParams.set("userId", String(user.id));
+  res.redirect(redirectUrl.toString());
 });
 
 // POST /api/auth/strava/sync/:userId
