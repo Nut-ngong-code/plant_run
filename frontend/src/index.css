@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700;800&display=swap");
 
 @tailwind base;
 @tailwind components;
@@ -8,7 +8,64 @@
   color-scheme: light;
 }
 
+html, body, #root {
+  min-height: 100%;
+}
+
 body {
-  @apply bg-plant-50 text-gray-800 font-sans min-h-screen;
+  @apply text-plant-900 font-sans;
   margin: 0;
+  background: #F4F7F1;
+  background-image:
+    radial-gradient(ellipse 60% 40% at 0% 0%, rgba(133, 212, 166, 0.35) 0%, transparent 60%),
+    radial-gradient(ellipse 50% 35% at 100% 5%, rgba(244, 185, 64, 0.18) 0%, transparent 60%),
+    radial-gradient(ellipse 70% 50% at 50% 100%, rgba(101, 137, 87, 0.20) 0%, transparent 65%),
+    linear-gradient(180deg, #F4F7F1 0%, #FBF9F2 60%, #F0FAF5 100%);
+  background-attachment: fixed;
+}
+
+@layer components {
+  .glass {
+    @apply bg-white/70 backdrop-blur-md border border-white/60 shadow-glass;
+  }
+  .glass-strong {
+    @apply bg-white/85 backdrop-blur-xl border border-white/70 shadow-glass-lg;
+  }
+  .chip {
+    @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium;
+  }
+  .btn-primary {
+    @apply rounded-xl px-4 py-2.5 text-sm font-semibold text-white
+           bg-gradient-to-br from-plant-500 to-plant-700 shadow-glow-plant
+           hover:from-plant-400 hover:to-plant-600 active:scale-[0.98]
+           disabled:from-gray-300 disabled:to-gray-400 disabled:shadow-none disabled:cursor-not-allowed
+           transition-all duration-200;
+  }
+  .btn-strava {
+    @apply rounded-xl px-4 py-3 font-semibold text-white
+           bg-gradient-to-br from-orange-500 to-strava shadow-glow-strava
+           hover:brightness-105 active:scale-[0.98]
+           disabled:opacity-60 disabled:shadow-none
+           transition-all duration-200;
+  }
+  .btn-ghost {
+    @apply rounded-xl px-3 py-2 text-sm text-plant-800/80 hover:bg-white/60 transition;
+  }
+  .grad-text {
+    @apply bg-gradient-to-br from-plant-600 to-sage-500 bg-clip-text text-transparent;
+  }
+  .grad-text-sun {
+    @apply bg-gradient-to-br from-sun to-bark-500 bg-clip-text text-transparent;
+  }
+  .grad-text-strava {
+    @apply bg-gradient-to-br from-orange-500 to-strava bg-clip-text text-transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
 }
