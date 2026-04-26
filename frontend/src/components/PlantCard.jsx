@@ -24,30 +24,41 @@ export function PlantCard({ device, totalPoints, onAction, lastSyncedAt }) {
   };
 
   return (
-    <div className="bg-white rounded-2xl border border-plant-100 p-4 sm:p-5 flex flex-col gap-3 sm:gap-4">
-      <header className="flex items-start justify-between gap-2">
+    <div className="glass rounded-3xl p-5 flex flex-col gap-4 relative overflow-hidden animate-fade-up">
+      {/* soft corner accent */}
+      <div className="pointer-events-none absolute -top-16 -right-16 h-44 w-44 rounded-full bg-gradient-to-br from-plant-200/45 to-sage-200/40 blur-3xl" />
+
+      <header className="relative flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <div className="text-xs text-gray-400 font-mono truncate">{device.deviceId}</div>
-          <h3 className="text-base sm:text-lg font-semibold truncate">
+          <div className="text-[10px] uppercase tracking-wider text-plant-800/50 font-mono truncate">
+            {device.deviceId}
+          </div>
+          <h3 className="text-lg font-bold text-plant-900 truncate">
             {device.displayName ?? "กระถางของฉัน"}
           </h3>
         </div>
         <span
-          className={`text-xs px-2 py-0.5 rounded-full whitespace-nowrap ${
-            device.isOnline ? "bg-plant-100 text-plant-700" : "bg-gray-100 text-gray-500"
+          className={`chip whitespace-nowrap ${
+            device.isOnline
+              ? "bg-plant-100/80 text-plant-800 border border-plant-200/60"
+              : "bg-gray-100 text-gray-500 border border-gray-200"
           }`}
         >
-          {device.isOnline ? "● ออนไลน์" : "○ ออฟไลน์"}
+          <span className={`h-1.5 w-1.5 rounded-full ${device.isOnline ? "bg-plant-500 animate-pulse" : "bg-gray-400"}`} />
+          {device.isOnline ? "ออนไลน์" : "ออฟไลน์"}
         </span>
       </header>
 
-      <div className="flex items-center justify-center">
-        <PlantGraphic mood={mood} size={140} />
+      {/* plant stage */}
+      <div className="relative flex items-center justify-center py-2">
+        {/* soil dish shadow */}
+        <div className="absolute bottom-3 h-3 w-32 rounded-full bg-plant-700/15 blur-md" />
+        <PlantGraphic mood={mood} size={148} />
       </div>
 
       <MoistureGauge percent={moisture} />
 
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-2 gap-2.5">
         <ActionButton
           label="รดน้ำ"
           emoji="💧"
@@ -69,13 +80,13 @@ export function PlantCard({ device, totalPoints, onAction, lastSyncedAt }) {
       </div>
 
       {errorMsg && (
-        <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2">
+        <div className="text-sm text-red-700 bg-red-50/80 backdrop-blur border border-red-200 rounded-lg px-3 py-2">
           {errorMsg}
         </div>
       )}
 
       {lastSyncedAt && (
-        <div className="text-xs text-gray-400 text-right">
+        <div className="text-[11px] text-plant-800/50 text-right">
           อัปเดต {new Date(lastSyncedAt).toLocaleTimeString("th-TH")}
         </div>
       )}
@@ -84,18 +95,24 @@ export function PlantCard({ device, totalPoints, onAction, lastSyncedAt }) {
 }
 
 function ActionButton({ label, emoji, cost, disabled, busy, onClick, variant }) {
-  const bg = variant === "water" ? "bg-sky-500 hover:bg-sky-600" : "bg-amber-500 hover:bg-amber-600";
+  const palette =
+    variant === "water"
+      ? "from-sky-400 to-cyan-600 shadow-glow-water"
+      : "from-amber-400 to-orange-500 shadow-glow-fert";
   return (
     <button
       disabled={disabled || busy}
       onClick={onClick}
-      className={`rounded-lg text-white font-medium py-2.5 px-2 sm:px-3 flex items-center justify-center gap-1 sm:gap-2 transition text-sm ${bg} disabled:bg-gray-300 disabled:cursor-not-allowed`}
+      className={`relative overflow-hidden rounded-xl text-white font-semibold py-2.5 px-3 flex items-center justify-center gap-1.5 text-sm transition-all duration-200
+        bg-gradient-to-br ${palette}
+        hover:brightness-110 active:scale-[0.97]
+        disabled:from-gray-300 disabled:to-gray-400 disabled:shadow-none disabled:cursor-not-allowed`}
     >
-      <span>{emoji}</span>
+      <span className="text-base" aria-hidden>{emoji}</span>
       <span className="whitespace-nowrap">
-        {label} <span className="opacity-80 text-xs">-{cost}</span>
+        {label} <span className="opacity-85 text-[11px] font-medium">−{cost}</span>
       </span>
-      {busy && <span className="animate-pulse">…</span>}
+      {busy && <span className="ml-0.5 animate-pulse">…</span>}
     </button>
   );
 }

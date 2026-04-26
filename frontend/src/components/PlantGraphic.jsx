@@ -1,72 +1,135 @@
 // รูปกราฟิกต้นไม้ที่เปลี่ยนตามสถานะความชื้น+แต้ม
-// ไม่ได้ใช้ไฟล์ SVG ภายนอก — วาดด้วย inline SVG ง่ายๆ
+// SVG วาดเอง พร้อม gradient + animated breathing + sway
 // mood: "happy" | "neutral" | "sad"
 
-export function PlantGraphic({ mood = "happy", size = 160 }) {
+export function PlantGraphic({ mood = "happy", size = 160, animated = true }) {
   const palette = {
-    happy: { leaf: "#1D9E75", leafDark: "#157554", droop: 0, blush: "#F4B8A7" },
-    neutral: { leaf: "#8CB28A", leafDark: "#5D8B60", droop: 6, blush: null },
-    sad: { leaf: "#9B8D5E", leafDark: "#6E6541", droop: 14, blush: null },
+    happy:   { leaf: "#1D9E75", leafLight: "#4DBC83", leafDark: "#0F5C42", droop: 0,  blush: "#F4B8A7", glow: "#85D4A6" },
+    neutral: { leaf: "#85A773", leafLight: "#A8C397", leafDark: "#5D8B60", droop: 6,  blush: null,      glow: "#CADBBC" },
+    sad:     { leaf: "#9B8D5E", leafLight: "#B6AC85", leafDark: "#6E6541", droop: 14, blush: null,      glow: "#ECE3C8" },
   }[mood];
 
+  const id = `pg-${mood}`;
+  const breathe = animated ? "animate-breathe" : "";
+
   return (
-    <svg viewBox="0 0 160 180" width={size} height={(size * 180) / 160} role="img" aria-label={`plant ${mood}`}>
-      {/* pot */}
-      <path d="M40 140 L120 140 L110 175 L50 175 Z" fill="#BA7517" />
-      <rect x="36" y="132" width="88" height="12" rx="3" fill="#A35F10" />
+    <svg
+      viewBox="0 0 180 200"
+      width={size}
+      height={(size * 200) / 180}
+      role="img"
+      aria-label={`plant ${mood}`}
+      className="drop-shadow-[0_8px_18px_rgba(15,92,66,0.18)]"
+    >
+      <defs>
+        <radialGradient id={`${id}-glow`} cx="50%" cy="55%" r="55%">
+          <stop offset="0%" stopColor={palette.glow} stopOpacity="0.55" />
+          <stop offset="100%" stopColor={palette.glow} stopOpacity="0" />
+        </radialGradient>
+        <linearGradient id={`${id}-leaf`} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor={palette.leafLight} />
+          <stop offset="100%" stopColor={palette.leaf} />
+        </linearGradient>
+        <linearGradient id={`${id}-leafDark`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={palette.leaf} />
+          <stop offset="100%" stopColor={palette.leafDark} />
+        </linearGradient>
+        <linearGradient id={`${id}-pot`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#C98C4D" />
+          <stop offset="100%" stopColor="#8C5A24" />
+        </linearGradient>
+        <linearGradient id={`${id}-rim`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#D9A266" />
+          <stop offset="100%" stopColor="#A36F30" />
+        </linearGradient>
+        <linearGradient id={`${id}-soil`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#3F2A18" />
+          <stop offset="100%" stopColor="#5A3D24" />
+        </linearGradient>
+      </defs>
 
-      {/* stem */}
-      <path
-        d={`M80 135 Q80 ${100 + palette.droop} 80 ${70 + palette.droop}`}
-        stroke={palette.leafDark}
-        strokeWidth="4"
-        fill="none"
-        strokeLinecap="round"
-      />
+      {/* glow halo */}
+      <ellipse cx="90" cy="100" rx="80" ry="78" fill={`url(#${id}-glow)`} />
 
-      {/* left leaf */}
-      <ellipse
-        cx={50}
-        cy={85 + palette.droop}
-        rx="22"
-        ry="14"
-        fill={palette.leaf}
-        transform={`rotate(-25 50 ${85 + palette.droop})`}
-      />
-      {/* right leaf */}
-      <ellipse
-        cx={110}
-        cy={95 + palette.droop}
-        rx="22"
-        ry="14"
-        fill={palette.leaf}
-        transform={`rotate(25 110 ${95 + palette.droop})`}
-      />
-      {/* top leaves */}
-      <ellipse cx="80" cy={55 + palette.droop} rx="16" ry="22" fill={palette.leafDark} />
-      <ellipse cx="72" cy={45 + palette.droop} rx="10" ry="14" fill={palette.leaf} transform={`rotate(-20 72 ${45 + palette.droop})`} />
-      <ellipse cx="88" cy={48 + palette.droop} rx="10" ry="14" fill={palette.leaf} transform={`rotate(20 88 ${48 + palette.droop})`} />
+      {/* plant cluster (breathing) */}
+      <g className={breathe} style={{ transformOrigin: "90px 130px" }}>
+        {/* stem */}
+        <path
+          d={`M90 145 Q90 ${108 + palette.droop} 90 ${78 + palette.droop}`}
+          stroke={`url(#${id}-leafDark)`}
+          strokeWidth="5"
+          fill="none"
+          strokeLinecap="round"
+        />
 
-      {/* face */}
-      <g transform={`translate(0 ${palette.droop})`}>
-        <circle cx="72" cy="110" r="2.2" fill="#333" />
-        <circle cx="88" cy="110" r="2.2" fill="#333" />
-        {mood === "happy" && <path d="M73 118 Q80 124 87 118" stroke="#333" strokeWidth="2" fill="none" strokeLinecap="round" />}
-        {mood === "neutral" && <path d="M73 119 L87 119" stroke="#333" strokeWidth="2" strokeLinecap="round" />}
-        {mood === "sad" && <path d="M73 122 Q80 116 87 122" stroke="#333" strokeWidth="2" fill="none" strokeLinecap="round" />}
-        {palette.blush && (
-          <>
-            <circle cx="68" cy="116" r="3" fill={palette.blush} opacity="0.7" />
-            <circle cx="92" cy="116" r="3" fill={palette.blush} opacity="0.7" />
-          </>
-        )}
+        {/* left leaf */}
+        <ellipse
+          cx={56}
+          cy={92 + palette.droop}
+          rx="26"
+          ry="15"
+          fill={`url(#${id}-leaf)`}
+          transform={`rotate(-25 56 ${92 + palette.droop})`}
+        />
+        <path
+          d={`M40 ${94 + palette.droop} Q56 ${88 + palette.droop} 76 ${92 + palette.droop}`}
+          stroke={palette.leafDark}
+          strokeWidth="1.2"
+          fill="none"
+          opacity="0.5"
+        />
+
+        {/* right leaf */}
+        <ellipse
+          cx={124}
+          cy={102 + palette.droop}
+          rx="26"
+          ry="15"
+          fill={`url(#${id}-leaf)`}
+          transform={`rotate(25 124 ${102 + palette.droop})`}
+        />
+        <path
+          d={`M104 ${100 + palette.droop} Q124 ${106 + palette.droop} 144 ${102 + palette.droop}`}
+          stroke={palette.leafDark}
+          strokeWidth="1.2"
+          fill="none"
+          opacity="0.5"
+        />
+
+        {/* top cluster */}
+        <ellipse cx="90" cy={62 + palette.droop} rx="18" ry="25" fill={`url(#${id}-leafDark)`} />
+        <ellipse cx="80" cy={50 + palette.droop} rx="11" ry="16" fill={`url(#${id}-leaf)`} transform={`rotate(-22 80 ${50 + palette.droop})`} />
+        <ellipse cx="100" cy={54 + palette.droop} rx="11" ry="16" fill={`url(#${id}-leaf)`} transform={`rotate(22 100 ${54 + palette.droop})`} />
+        <path d={`M90 ${42 + palette.droop} L90 ${72 + palette.droop}`} stroke={palette.leafDark} strokeWidth="1" opacity="0.4" />
+
+        {/* face on stem */}
+        <g transform={`translate(0 ${palette.droop})`}>
+          <circle cx="82" cy="118" r="2.4" fill="#1A2A22" />
+          <circle cx="98" cy="118" r="2.4" fill="#1A2A22" />
+          {mood === "happy"   && <path d="M83 126 Q90 132 97 126" stroke="#1A2A22" strokeWidth="2" fill="none" strokeLinecap="round" />}
+          {mood === "neutral" && <path d="M83 127 L97 127" stroke="#1A2A22" strokeWidth="2" strokeLinecap="round" />}
+          {mood === "sad"     && <path d="M83 130 Q90 124 97 130" stroke="#1A2A22" strokeWidth="2" fill="none" strokeLinecap="round" />}
+          {palette.blush && (
+            <>
+              <circle cx="78" cy="124" r="3" fill={palette.blush} opacity="0.7" />
+              <circle cx="102" cy="124" r="3" fill={palette.blush} opacity="0.7" />
+            </>
+          )}
+        </g>
       </g>
+
+      {/* pot rim + body */}
+      <rect x="38" y="142" width="104" height="14" rx="4" fill={`url(#${id}-rim)`} />
+      <path d="M44 156 L136 156 L124 192 L56 192 Z" fill={`url(#${id}-pot)`} />
+      {/* pot highlight */}
+      <path d="M52 160 L60 188" stroke="#E5B27C" strokeWidth="3" strokeLinecap="round" opacity="0.55" />
+      {/* soil */}
+      <ellipse cx="90" cy="148" rx="48" ry="5" fill={`url(#${id}-soil)`} />
     </svg>
   );
 }
 
 export function moodFromStatus({ moisturePercent, totalPoints }) {
-  // ง่ายๆ: ดินชื้น + มีแต้มเหลือ → สดใส, ดินแห้ง/ไม่มีแต้ม → เหี่ยว
   const m = moisturePercent ?? 50;
   if (m < 25) return "sad";
   if (m < 50 || (totalPoints ?? 0) < 15) return "neutral";
