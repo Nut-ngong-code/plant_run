@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Header } from "../components/Header.jsx";
+import { GardenBackdrop } from "../components/GardenBackdrop.jsx";
 import { getDashboard, registerDevice } from "../api/endpoints.js";
 import { getUserId } from "../lib/session.js";
 
@@ -43,26 +44,28 @@ export function AddDevice() {
 
   return (
     <>
+      <GardenBackdrop />
       <Header user={user} />
-      <main className="max-w-xl mx-auto px-4 py-6">
-        <h1 className="text-xl sm:text-2xl font-bold text-plant-700 mb-1">เพิ่มกระถาง</h1>
-        <p className="text-sm text-gray-500 mb-6">
-          ดู Device ID ที่ติดบนตัวบอร์ด ESP32 ของกระถาง แล้วกรอกลงด้านล่าง
-        </p>
+      <main className="max-w-xl mx-auto px-4 py-7">
+        <div className="animate-fade-up">
+          <span className="chip bg-white/70 border border-white/70 text-plant-800/70">🪴 เพิ่มกระถางใหม่</span>
+          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-plant-900 mt-2">
+            ผูก<span className="grad-text">ESP32</span>กับสวนของคุณ
+          </h1>
+          <p className="text-sm text-plant-800/60 mt-1.5">
+            ดู Device ID ที่ติดบนตัวบอร์ด ESP32 แล้วกรอกลงด้านล่าง
+          </p>
+        </div>
 
-        <form onSubmit={onSubmit} className="bg-white border border-plant-100 rounded-2xl p-5 sm:p-6 space-y-4">
-          <Field
-            label="Device ID"
-            hint="เช่น POT-001 หรือ MAC address ของบอร์ด (ห้ามซ้ำกับผู้ใช้อื่น)"
-            required
-          >
+        <form onSubmit={onSubmit} className="glass rounded-3xl p-6 sm:p-7 space-y-5 mt-5">
+          <Field label="Device ID" hint="เช่น POT-001 หรือ MAC address ของบอร์ด (ห้ามซ้ำกับผู้ใช้อื่น)" required>
             <input
               type="text"
               value={deviceId}
               onChange={(e) => setDeviceId(e.target.value)}
               placeholder="POT-001"
               autoFocus
-              className="w-full border border-gray-200 rounded-lg px-3 py-2.5 font-mono focus:outline-none focus:border-plant-500"
+              className="w-full bg-white/80 border border-white/70 rounded-xl px-3.5 py-2.5 font-mono focus:outline-none focus:ring-2 focus:ring-plant-300 focus:border-plant-300 transition"
             />
           </Field>
 
@@ -72,42 +75,38 @@ export function AddDevice() {
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
               placeholder="ต้นกระบองเพชร"
-              className="w-full border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:border-plant-500"
+              className="w-full bg-white/80 border border-white/70 rounded-xl px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-plant-300 focus:border-plant-300 transition"
             />
           </Field>
 
           {error && (
-            <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-md px-3 py-2">
+            <div className="text-sm text-red-700 bg-red-50/80 backdrop-blur border border-red-200 rounded-xl px-3.5 py-2.5">
               {error}
             </div>
           )}
 
           {success && (
-            <div className="text-sm text-plant-700 bg-plant-100 border border-plant-500/30 rounded-md px-3 py-2">
+            <div className="text-sm text-plant-800 bg-plant-100/80 backdrop-blur border border-plant-200 rounded-xl px-3.5 py-2.5">
               ✅ เพิ่มกระถางสำเร็จ กำลังกลับไปหน้าแดชบอร์ด…
             </div>
           )}
 
-          <div className="flex flex-col sm:flex-row gap-2 pt-2">
-            <button
-              type="submit"
-              disabled={!valid || submitting}
-              className="flex-1 bg-plant-500 hover:bg-plant-700 disabled:bg-gray-300 text-white font-medium rounded-lg py-2.5"
-            >
+          <div className="flex flex-col sm:flex-row gap-2 pt-1">
+            <button type="submit" disabled={!valid || submitting} className="btn-primary flex-1">
               {submitting ? "กำลังบันทึก…" : "บันทึกกระถาง"}
             </button>
             <button
               type="button"
               onClick={() => navigate("/")}
-              className="flex-1 sm:flex-initial sm:px-6 border border-gray-200 hover:bg-gray-50 text-gray-600 rounded-lg py-2.5"
+              className="flex-1 sm:flex-initial sm:px-6 bg-white/70 hover:bg-white/90 border border-white/70 text-plant-800/80 rounded-xl py-2.5 transition"
             >
               ยกเลิก
             </button>
           </div>
         </form>
 
-        <div className="mt-6 text-xs text-gray-400 leading-relaxed">
-          <strong className="text-gray-500">หมายเหตุ:</strong> ถ้า Device ID นี้เคยถูกผูกไว้ก่อนแล้ว
+        <div className="mt-6 text-xs text-plant-800/50 leading-relaxed">
+          <strong className="text-plant-800/70">หมายเหตุ:</strong> ถ้า Device ID นี้เคยถูกผูกไว้ก่อนแล้ว
           ระบบจะย้ายมาเป็นของคุณแทน (update โดย unique key)
         </div>
       </main>
@@ -118,14 +117,14 @@ export function AddDevice() {
 function Field({ label, hint, required, children }) {
   return (
     <label className="block">
-      <div className="flex items-baseline justify-between mb-1">
-        <span className="text-sm font-medium text-gray-700">
+      <div className="flex items-baseline justify-between mb-1.5">
+        <span className="text-sm font-semibold text-plant-900">
           {label}
           {required && <span className="text-red-500 ml-0.5">*</span>}
         </span>
       </div>
       {children}
-      {hint && <p className="mt-1 text-xs text-gray-400">{hint}</p>}
+      {hint && <p className="mt-1.5 text-xs text-plant-800/50">{hint}</p>}
     </label>
   );
 }

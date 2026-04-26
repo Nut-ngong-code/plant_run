@@ -4,6 +4,7 @@ import { Header } from "../components/Header.jsx";
 import { StatsBar } from "../components/StatsBar.jsx";
 import { PlantCard } from "../components/PlantCard.jsx";
 import { RecentActions } from "../components/RecentActions.jsx";
+import { GardenBackdrop } from "../components/GardenBackdrop.jsx";
 import { getDashboard, sendAction, syncStrava } from "../api/endpoints.js";
 import { getUserId } from "../lib/session.js";
 
@@ -59,9 +60,10 @@ export function Dashboard() {
   if (loadError && !data) {
     return (
       <>
+        <GardenBackdrop />
         <Header />
-        <main className="max-w-5xl mx-auto px-4 py-6 sm:py-8">
-          <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl p-4 text-sm">
+        <main className="max-w-5xl mx-auto px-4 py-8">
+          <div className="glass rounded-2xl p-5 text-sm text-red-700 border border-red-200">
             โหลดข้อมูลไม่สำเร็จ: {loadError}
           </div>
         </main>
@@ -72,56 +74,75 @@ export function Dashboard() {
   if (!data) {
     return (
       <>
+        <GardenBackdrop />
         <Header />
-        <main className="max-w-5xl mx-auto px-4 py-8 text-gray-500">กำลังโหลด…</main>
+        <main className="max-w-5xl mx-auto px-4 py-12 text-plant-800/60">
+          <div className="glass rounded-2xl p-8 text-center animate-pulse">
+            🌱 กำลังโหลดสวนของคุณ…
+          </div>
+        </main>
       </>
     );
   }
 
   return (
     <>
+      <GardenBackdrop />
       <Header user={data.user} />
-      <main className="max-w-5xl mx-auto px-4 py-4 sm:py-6 space-y-5 sm:space-y-6">
-        <section className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+      <main className="max-w-5xl mx-auto px-4 py-5 sm:py-7 space-y-6 sm:space-y-7">
+        <section className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 animate-fade-up">
           <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-plant-700">แดชบอร์ดของคุณ</h1>
-            <p className="text-xs sm:text-sm text-gray-500">
-              วิ่งเพื่อสะสมแต้ม นำไปแลกการรดน้ำต้นไม้
+            <span className="chip bg-white/70 border border-white/70 text-plant-800/70">
+              <span className="h-1.5 w-1.5 rounded-full bg-plant-500 animate-pulse" />
+              สวัสดี {data.user.displayName?.split(" ")[0] ?? "นักวิ่ง"}
+            </span>
+            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-plant-900 mt-2">
+              สวนของ<span className="grad-text">คุณ</span>วันนี้
+            </h1>
+            <p className="text-sm text-plant-800/60 mt-1">
+              วิ่งเพื่อสะสมแต้ม นำไปแลกการรดน้ำให้เพื่อนต้นไม้
             </p>
           </div>
-          <div className="flex flex-col items-stretch sm:items-end gap-1 sm:gap-2">
+          <div className="flex flex-col items-stretch sm:items-end gap-1.5">
             <button
               onClick={handleSyncStrava}
               disabled={syncing}
-              className="bg-strava hover:bg-orange-600 text-white text-sm font-medium rounded-lg px-4 py-2 disabled:opacity-60 w-full sm:w-auto"
+              className="btn-strava flex items-center justify-center gap-2"
             >
-              {syncing ? "กำลังซิงก์…" : "ซิงก์ Strava"}
+              <SyncIcon spinning={syncing} />
+              <span>{syncing ? "กำลังซิงก์…" : "ซิงก์ Strava"}</span>
             </button>
-            {syncMsg && <span className="text-xs text-gray-500">{syncMsg}</span>}
+            {syncMsg && <span className="text-xs text-plant-800/55 sm:text-right max-w-xs">{syncMsg}</span>}
           </div>
         </section>
 
         <StatsBar user={data.user} weekly={data.weekly} />
 
-        <section>
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-base sm:text-lg font-semibold">กระถางของฉัน</h2>
+        <section className="space-y-3 sm:space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg sm:text-xl font-bold text-plant-900">
+              <span aria-hidden>🪴</span> กระถางของฉัน
+            </h2>
             <Link
               to="/devices/new"
-              className="text-xs sm:text-sm text-plant-700 hover:underline"
+              className="chip bg-white/70 border border-white/70 text-plant-800 hover:bg-white transition"
             >
-              + เพิ่มกระถาง
+              <span className="text-base leading-none">+</span> เพิ่มกระถาง
             </Link>
           </div>
           {data.devices.length === 0 ? (
-            <div className="bg-white rounded-xl border border-plant-100 p-5 sm:p-6 text-sm text-gray-500">
-              ยังไม่มีกระถางที่ผูกกับบัญชี —{" "}
-              <Link to="/devices/new" className="text-plant-700 underline">
-                เพิ่มกระถางที่นี่
+            <div className="glass rounded-2xl p-7 text-center">
+              <div className="text-4xl mb-2" aria-hidden>🌱</div>
+              <p className="text-sm text-plant-800/70">ยังไม่มีกระถางที่ผูกกับบัญชี</p>
+              <Link
+                to="/devices/new"
+                className="btn-primary inline-flex mt-4"
+              >
+                เพิ่มกระถางแรก
               </Link>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {data.devices.map((d) => (
                 <PlantCard
                   key={d.id}
@@ -136,7 +157,29 @@ export function Dashboard() {
         </section>
 
         <RecentActions items={data.recentActions} />
+
+        <footer className="pt-4 pb-8 text-center text-[11px] text-plant-800/40">
+          🌿 ทุกก้าววิ่ง = ชีวิตของต้นไม้เล็กๆ
+        </footer>
       </main>
     </>
+  );
+}
+
+function SyncIcon({ spinning }) {
+  return (
+    <svg
+      width="15"
+      height="15"
+      viewBox="0 0 16 16"
+      fill="none"
+      className={spinning ? "animate-spin" : ""}
+      aria-hidden
+    >
+      <path d="M2.5 8C2.5 4.96 4.96 2.5 8 2.5C9.66 2.5 11.13 3.23 12.13 4.4M13.5 8C13.5 11.04 11.04 13.5 8 13.5C6.34 13.5 4.87 12.77 3.87 11.6"
+        stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+      <path d="M11.5 2L12.5 4.5L10 4.7M4.5 14L3.5 11.5L6 11.3"
+        stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+    </svg>
   );
 }
