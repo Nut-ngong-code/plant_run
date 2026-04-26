@@ -9,7 +9,10 @@ export function Login() {
   const [devId, setDevId] = useState("");
 
   const connectStrava = () => {
-    window.location.href = "/api/auth/strava/login";
+    // Forward the actual frontend origin so the backend can redirect back to
+    // the right port (Vite may be on :5173, :5174, or anywhere else).
+    const returnTo = encodeURIComponent(window.location.origin);
+    window.location.href = `/api/auth/strava/login?return_to=${returnTo}`;
   };
 
   const devLogin = (e) => {
