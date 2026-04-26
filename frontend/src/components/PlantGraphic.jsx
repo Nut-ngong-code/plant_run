@@ -1,12 +1,36 @@
-// รูปกราฟิกต้นไม้ที่เปลี่ยนตามสถานะความชื้น+แต้ม
-// SVG วาดเอง พร้อม gradient + animated breathing + sway
+// Plant SVG tuned for the bright/light theme.
+// Saturated leaves with a soft drop shadow that reads on a light glass surface.
 // mood: "happy" | "neutral" | "sad"
 
 export function PlantGraphic({ mood = "happy", size = 160, animated = true }) {
   const palette = {
-    happy:   { leaf: "#1D9E75", leafLight: "#4DBC83", leafDark: "#0F5C42", droop: 0,  blush: "#F4B8A7", glow: "#85D4A6" },
-    neutral: { leaf: "#85A773", leafLight: "#A8C397", leafDark: "#5D8B60", droop: 6,  blush: null,      glow: "#CADBBC" },
-    sad:     { leaf: "#9B8D5E", leafLight: "#B6AC85", leafDark: "#6E6541", droop: 14, blush: null,      glow: "#ECE3C8" },
+    happy: {
+      leaf: "#0EA15A",
+      leafLight: "#5FD491",
+      leafDark: "#054C26",
+      droop: 0,
+      blush: "#F4B8A7",
+      glow: "#94E9B5",
+      glowOpacity: 0.55,
+    },
+    neutral: {
+      leaf: "#5E8267",
+      leafLight: "#85A48C",
+      leafDark: "#1F3527",
+      droop: 6,
+      blush: null,
+      glow: "#B0C7B5",
+      glowOpacity: 0.35,
+    },
+    sad: {
+      leaf: "#7A8460",
+      leafLight: "#A7B085",
+      leafDark: "#3F3A26",
+      droop: 14,
+      blush: null,
+      glow: "#D5DBC0",
+      glowOpacity: 0.25,
+    },
   }[mood];
 
   const id = `pg-${mood}`;
@@ -19,11 +43,11 @@ export function PlantGraphic({ mood = "happy", size = 160, animated = true }) {
       height={(size * 200) / 180}
       role="img"
       aria-label={`plant ${mood}`}
-      className="drop-shadow-[0_8px_18px_rgba(15,92,66,0.18)]"
+      className="drop-shadow-[0_8px_18px_rgba(15,42,30,0.18)]"
     >
       <defs>
         <radialGradient id={`${id}-glow`} cx="50%" cy="55%" r="55%">
-          <stop offset="0%" stopColor={palette.glow} stopOpacity="0.55" />
+          <stop offset="0%" stopColor={palette.glow} stopOpacity={palette.glowOpacity} />
           <stop offset="100%" stopColor={palette.glow} stopOpacity="0" />
         </radialGradient>
         <linearGradient id={`${id}-leaf`} x1="0" y1="0" x2="1" y2="1">
@@ -76,7 +100,7 @@ export function PlantGraphic({ mood = "happy", size = 160, animated = true }) {
           stroke={palette.leafDark}
           strokeWidth="1.2"
           fill="none"
-          opacity="0.5"
+          opacity="0.55"
         />
 
         {/* right leaf */}
@@ -93,22 +117,59 @@ export function PlantGraphic({ mood = "happy", size = 160, animated = true }) {
           stroke={palette.leafDark}
           strokeWidth="1.2"
           fill="none"
-          opacity="0.5"
+          opacity="0.55"
         />
 
         {/* top cluster */}
         <ellipse cx="90" cy={62 + palette.droop} rx="18" ry="25" fill={`url(#${id}-leafDark)`} />
-        <ellipse cx="80" cy={50 + palette.droop} rx="11" ry="16" fill={`url(#${id}-leaf)`} transform={`rotate(-22 80 ${50 + palette.droop})`} />
-        <ellipse cx="100" cy={54 + palette.droop} rx="11" ry="16" fill={`url(#${id}-leaf)`} transform={`rotate(22 100 ${54 + palette.droop})`} />
-        <path d={`M90 ${42 + palette.droop} L90 ${72 + palette.droop}`} stroke={palette.leafDark} strokeWidth="1" opacity="0.4" />
+        <ellipse
+          cx="80"
+          cy={50 + palette.droop}
+          rx="11"
+          ry="16"
+          fill={`url(#${id}-leaf)`}
+          transform={`rotate(-22 80 ${50 + palette.droop})`}
+        />
+        <ellipse
+          cx="100"
+          cy={54 + palette.droop}
+          rx="11"
+          ry="16"
+          fill={`url(#${id}-leaf)`}
+          transform={`rotate(22 100 ${54 + palette.droop})`}
+        />
+        <path
+          d={`M90 ${42 + palette.droop} L90 ${72 + palette.droop}`}
+          stroke={palette.leafDark}
+          strokeWidth="1"
+          opacity="0.4"
+        />
 
         {/* face on stem */}
         <g transform={`translate(0 ${palette.droop})`}>
           <circle cx="82" cy="118" r="2.4" fill="#1A2A22" />
           <circle cx="98" cy="118" r="2.4" fill="#1A2A22" />
-          {mood === "happy"   && <path d="M83 126 Q90 132 97 126" stroke="#1A2A22" strokeWidth="2" fill="none" strokeLinecap="round" />}
-          {mood === "neutral" && <path d="M83 127 L97 127" stroke="#1A2A22" strokeWidth="2" strokeLinecap="round" />}
-          {mood === "sad"     && <path d="M83 130 Q90 124 97 130" stroke="#1A2A22" strokeWidth="2" fill="none" strokeLinecap="round" />}
+          {mood === "happy" && (
+            <path
+              d="M83 126 Q90 132 97 126"
+              stroke="#1A2A22"
+              strokeWidth="2"
+              fill="none"
+              strokeLinecap="round"
+            />
+          )}
+          {mood === "neutral" && (
+            <path d="M83 127 L97 127" stroke="#1A2A22" strokeWidth="2" strokeLinecap="round" />
+          )}
+          {mood === "sad" && (
+            <path
+              d="M83 130 Q90 124 97 130"
+              stroke="#1A2A22"
+              strokeWidth="2"
+              fill="none"
+              strokeLinecap="round"
+            />
+          )}
           {palette.blush && (
             <>
               <circle cx="78" cy="124" r="3" fill={palette.blush} opacity="0.7" />
@@ -122,7 +183,13 @@ export function PlantGraphic({ mood = "happy", size = 160, animated = true }) {
       <rect x="38" y="142" width="104" height="14" rx="4" fill={`url(#${id}-rim)`} />
       <path d="M44 156 L136 156 L124 192 L56 192 Z" fill={`url(#${id}-pot)`} />
       {/* pot highlight */}
-      <path d="M52 160 L60 188" stroke="#E5B27C" strokeWidth="3" strokeLinecap="round" opacity="0.55" />
+      <path
+        d="M52 160 L60 188"
+        stroke="#E5B27C"
+        strokeWidth="3"
+        strokeLinecap="round"
+        opacity="0.55"
+      />
       {/* soil */}
       <ellipse cx="90" cy="148" rx="48" ry="5" fill={`url(#${id}-soil)`} />
     </svg>

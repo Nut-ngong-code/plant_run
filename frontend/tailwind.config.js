@@ -11,56 +11,85 @@ export default {
     },
     extend: {
       colors: {
+        // Bright surface scale — page background + card tints (light → slightly tinted)
+        paper: {
+          0: "#FFFFFF",
+          50: "#FAFEFB",
+          100: "#F4FAF5",
+          200: "#EAF3EC",
+          300: "#D8E8DB",
+          400: "#BFD3C3",
+          500: "#9FB8A4",
+        },
+        // Text + soft borders (dark → muted) for use on light surfaces
+        forest: {
+          50: "#F1F7F2",
+          100: "#D7E4D9",
+          200: "#B0C7B5",
+          300: "#85A48C",
+          400: "#5E8267",
+          500: "#42624A",
+          600: "#2E4A36",
+          700: "#1F3527",
+          800: "#15291F",
+          900: "#0B1F18",
+        },
+        // Vibrant plant accent (buttons, gauges, brand)
         plant: {
-          50: "#F0FAF5",
-          100: "#DCF4E6",
-          200: "#B6E7C9",
-          300: "#85D4A6",
-          400: "#4DBC83",
-          500: "#1D9E75",
-          600: "#16855E",
-          700: "#157554",
-          800: "#0F5C42",
-          900: "#0A4131",
+          50: "#E8FFF1",
+          100: "#C5F8D8",
+          200: "#94E9B5",
+          300: "#5FD491",
+          400: "#2EBE73",
+          500: "#0EA15A",
+          600: "#0A8347",
+          700: "#076635",
+          800: "#054C26",
+          900: "#03341B",
         },
-        sage: {
-          50: "#F4F7F1",
-          100: "#E5EDDD",
-          200: "#CADBBC",
-          300: "#A8C397",
-          400: "#85A773",
-          500: "#658957",
+        // Sunrise orange (Strava, run stats)
+        sun: {
+          50: "#FFF7E8",
+          100: "#FFE6BC",
+          200: "#FFCB7A",
+          300: "#FFB347",
+          400: "#FB8C00",
+          500: "#E76A00",
+          600: "#B85100",
         },
-        cream: {
-          50: "#FBF9F2",
-          100: "#F5F0E0",
-          200: "#ECE3C8",
+        // Sky / water (moisture, water button)
+        sky2: {
+          100: "#DCF2FB",
+          200: "#B5E1F5",
+          300: "#7DD3FC",
+          400: "#38BDF8",
+          500: "#0EA5E9",
+          600: "#0284C7",
         },
-        bark: {
-          400: "#B07A3D",
-          500: "#8C5A24",
-          600: "#6D4418",
-        },
-        sun: "#F4B940",
-        point: "#BA7517",
+        point: "#C77B12",
         strava: "#FC4C02",
       },
       fontFamily: {
         sans: ['"Noto Sans Thai"', "-apple-system", "BlinkMacSystemFont", "Segoe UI", "sans-serif"],
-        display: ['"Noto Sans Thai"', "-apple-system", "BlinkMacSystemFont", "Segoe UI", "sans-serif"],
+        display: ['"Space Grotesk"', '"Noto Sans Thai"', "sans-serif"],
+        mono: ['"JetBrains Mono"', '"Roboto Mono"', "ui-monospace", "monospace"],
       },
       boxShadow: {
-        glass: "0 8px 32px -8px rgba(21, 117, 84, 0.18), 0 2px 6px -2px rgba(21, 117, 84, 0.08)",
-        "glass-lg": "0 24px 60px -16px rgba(21, 117, 84, 0.28), 0 4px 12px -4px rgba(21, 117, 84, 0.10)",
-        "soft": "0 1px 3px rgba(15, 92, 66, 0.06), 0 8px 24px -10px rgba(15, 92, 66, 0.10)",
-        "glow-plant": "0 0 0 1px rgba(29, 158, 117, 0.15), 0 8px 24px -6px rgba(29, 158, 117, 0.45)",
-        "glow-water": "0 8px 22px -6px rgba(14, 165, 233, 0.5)",
-        "glow-fert": "0 8px 22px -6px rgba(245, 158, 11, 0.5)",
-        "glow-strava": "0 8px 22px -6px rgba(252, 76, 2, 0.45)",
+        // Soft drop shadows tuned for the light theme
+        soft: "0 1px 3px rgba(15, 42, 30, 0.05), 0 8px 24px -10px rgba(15, 42, 30, 0.08)",
+        glass:
+          "0 1px 0 rgba(255,255,255,0.7) inset, 0 8px 32px -8px rgba(15, 42, 30, 0.12), 0 2px 8px -2px rgba(15, 42, 30, 0.06)",
+        "glass-lg":
+          "0 1px 0 rgba(255,255,255,0.8) inset, 0 24px 60px -16px rgba(15, 42, 30, 0.18), 0 4px 12px -4px rgba(15, 42, 30, 0.08)",
+        "glow-plant": "0 8px 24px -6px rgba(14, 161, 90, 0.5)",
+        "glow-water": "0 8px 24px -6px rgba(14, 165, 233, 0.5)",
+        "glow-fert": "0 8px 24px -6px rgba(251, 140, 0, 0.5)",
+        "glow-strava": "0 8px 24px -6px rgba(252, 76, 2, 0.45)",
       },
       backgroundImage: {
-        "garden": "radial-gradient(ellipse at 0% 0%, #DCF4E6 0%, transparent 55%), radial-gradient(ellipse at 100% 0%, #F5F0E0 0%, transparent 50%), radial-gradient(ellipse at 50% 100%, #E5EDDD 0%, transparent 60%), linear-gradient(180deg, #F4F7F1 0%, #FBF9F2 100%)",
-        "leaf-stripes": "repeating-linear-gradient(135deg, rgba(29,158,117,0.04) 0 12px, transparent 12px 24px)",
+        "morning-sky":
+          "radial-gradient(ellipse 60% 40% at 0% 0%, rgba(125, 211, 252, 0.40) 0%, transparent 60%), radial-gradient(ellipse 50% 35% at 100% 0%, rgba(255, 179, 71, 0.22) 0%, transparent 60%), radial-gradient(ellipse 70% 50% at 50% 100%, rgba(94, 214, 145, 0.32) 0%, transparent 65%), linear-gradient(180deg, #F4FAF5 0%, #FAFEFB 60%, #EFF8F2 100%)",
+        "dot-grid": "radial-gradient(rgba(11, 31, 24, 0.08) 1px, transparent 1px)",
       },
       animation: {
         breathe: "breathe 4.5s ease-in-out infinite",

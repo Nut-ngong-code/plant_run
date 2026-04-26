@@ -80,84 +80,89 @@ export function History() {
     <>
       <GardenBackdrop />
       <Header user={dashboard?.user} />
-      <main className="max-w-5xl mx-auto px-4 py-7 space-y-6">
+      <main className="max-w-6xl mx-auto px-4 py-8 space-y-6">
         <section className="animate-fade-up">
-          <span className="chip bg-white/70 border border-white/70 text-plant-800/70">📊 สถิติย้อนหลัง</span>
-          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-plant-900 mt-2">
-            ประวัติและ<span className="grad-text">การเติบโต</span>
+          <span className="chip surface-flat text-forest-700">📊 STATS · 14 DAYS</span>
+          <h1 className="mt-3 font-display text-3xl font-bold tracking-tight text-forest-900">
+            HISTORY <span className="grad-text">&amp; GROWTH</span>
           </h1>
-          <p className="text-sm text-plant-800/60 mt-1">ข้อมูล 14 วันย้อนหลัง (กราฟ) + รายการทั้งหมด</p>
+          <p className="text-sm text-forest-500 mt-2">
+            ข้อมูล 14 วันย้อนหลัง (กราฟ) + รายการทั้งหมด
+          </p>
         </section>
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <Stat label="ระยะรวม" value={totalKm.toFixed(2)} suffix="กม." gradient="grad-text-strava" />
-          <Stat label="จำนวนครั้ง" value={totalRuns} suffix="ครั้ง" gradient="grad-text" />
-          <Stat label="รดน้ำ" value={totalWater} suffix="ครั้ง" gradient="grad-text" />
-          <Stat label="ให้ปุ๋ย" value={totalFert} suffix="ครั้ง" gradient="grad-text-sun" />
+          <Stat label="TOTAL DISTANCE" value={totalKm.toFixed(2)} suffix="KM" accent="strava" />
+          <Stat label="RUN COUNT" value={totalRuns} suffix="RUNS" accent="plant" />
+          <Stat label="WATER" value={totalWater} suffix="TIMES" accent="water" />
+          <Stat label="FERTILIZE" value={totalFert} suffix="TIMES" accent="sun" />
         </div>
 
         {loading ? (
-          <div className="glass rounded-2xl p-8 text-center text-plant-800/60 animate-pulse">
-            🌱 กำลังโหลดข้อมูล…
+          <div className="surface rounded-2xl p-10 text-center animate-pulse">
+            <div className="label-eyebrow text-plant-600">LOADING DATA…</div>
           </div>
         ) : (
           <>
-            <ChartCard title="ระยะวิ่งต่อวัน (14 วันหลังสุด)">
+            <ChartCard title="DISTANCE PER DAY (14d)">
               {runByDay.length === 0 ? (
                 <Empty text="ยังไม่มีประวัติการวิ่ง — ซิงก์ Strava ก่อน" />
               ) : (
                 <ResponsiveContainer width="100%" height={CHART_HEIGHT}>
                   <LineChart data={runByDay}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(15,92,66,0.08)" />
-                    <XAxis dataKey="label" tick={{ fontSize: 11, fill: "#475569" }} />
-                    <YAxis tick={{ fontSize: 11, fill: "#475569" }} unit=" km" />
-                    <Tooltip
-                      formatter={(v) => `${Number(v).toFixed(2)} กม.`}
-                      contentStyle={tooltipStyle}
-                    />
+                    <defs>
+                      <linearGradient id="kmStroke" x1="0" y1="0" x2="1" y2="0">
+                        <stop offset="0%" stopColor="#FFB347" />
+                        <stop offset="100%" stopColor="#FC4C02" />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="label" />
+                    <YAxis unit=" km" />
+                    <Tooltip formatter={(v) => `${Number(v).toFixed(2)} km`} />
                     <Line
                       type="monotone"
                       dataKey="km"
-                      stroke="#FC4C02"
+                      stroke="url(#kmStroke)"
                       strokeWidth={2.5}
                       dot={{ r: 3, fill: "#FC4C02" }}
-                      activeDot={{ r: 5 }}
-                      name="ระยะ"
+                      activeDot={{ r: 5, fill: "#FFB347" }}
+                      name="Distance"
                     />
                   </LineChart>
                 </ResponsiveContainer>
               )}
             </ChartCard>
 
-            <ChartCard title="จำนวนครั้งที่สั่งงานต่อวัน (14 วัน)">
+            <ChartCard title="ACTIONS PER DAY (14d)">
               {actionByDay.length === 0 ? (
                 <Empty text="ยังไม่มีประวัติการสั่งงาน" />
               ) : (
                 <ResponsiveContainer width="100%" height={CHART_HEIGHT}>
                   <BarChart data={actionByDay}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(15,92,66,0.08)" />
-                    <XAxis dataKey="label" tick={{ fontSize: 11, fill: "#475569" }} />
-                    <YAxis tick={{ fontSize: 11, fill: "#475569" }} allowDecimals={false} />
-                    <Tooltip contentStyle={tooltipStyle} />
-                    <Legend wrapperStyle={{ fontSize: 12 }} />
-                    <Bar dataKey="water" name="รดน้ำ" fill="#0EA5E9" radius={[6, 6, 0, 0]} />
-                    <Bar dataKey="fertilizer" name="ให้ปุ๋ย" fill="#F59E0B" radius={[6, 6, 0, 0]} />
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="label" />
+                    <YAxis allowDecimals={false} />
+                    <Tooltip />
+                    <Legend wrapperStyle={{ fontSize: 11, paddingTop: 8 }} />
+                    <Bar dataKey="water" name="Water" fill="#0EA5E9" radius={[6, 6, 0, 0]} />
+                    <Bar dataKey="fertilizer" name="Fertilize" fill="#FB8C00" radius={[6, 6, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               )}
             </ChartCard>
 
             <ChartCard
-              title="ความชื้นในดิน"
+              title="SOIL MOISTURE"
               right={
                 dashboard?.devices?.length > 1 && (
                   <select
                     value={selectedDevice ?? ""}
                     onChange={(e) => setSelectedDevice(e.target.value)}
-                    className="text-sm bg-white/80 border border-white/70 rounded-lg px-2.5 py-1.5"
+                    className="data-input text-sm py-1.5 px-2.5 w-auto"
                   >
                     {dashboard.devices.map((d) => (
-                      <option key={d.id} value={d.deviceId}>
+                      <option key={d.id} value={d.deviceId} className="bg-white text-forest-900">
                         {d.displayName ?? d.deviceId}
                       </option>
                     ))}
@@ -174,28 +179,28 @@ export function History() {
                   <LineChart data={soilSeries}>
                     <defs>
                       <linearGradient id="moistureG" x1="0" y1="0" x2="1" y2="0">
-                        <stop offset="0%" stopColor="#4DBC83" />
-                        <stop offset="100%" stopColor="#1D9E75" />
+                        <stop offset="0%" stopColor="#5FD491" />
+                        <stop offset="100%" stopColor="#0EA5E9" />
                       </linearGradient>
                     </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(15,92,66,0.08)" />
-                    <XAxis dataKey="label" tick={{ fontSize: 11, fill: "#475569" }} />
-                    <YAxis domain={[0, 100]} tick={{ fontSize: 11, fill: "#475569" }} unit="%" />
-                    <Tooltip formatter={(v) => `${v}%`} contentStyle={tooltipStyle} />
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="label" />
+                    <YAxis domain={[0, 100]} unit="%" />
+                    <Tooltip formatter={(v) => `${v}%`} />
                     <Line
                       type="monotone"
                       dataKey="moisture"
                       stroke="url(#moistureG)"
                       strokeWidth={2.5}
                       dot={false}
-                      name="ความชื้น"
+                      name="Moisture"
                     />
                   </LineChart>
                 </ResponsiveContainer>
               )}
             </ChartCard>
 
-            <ChartCard title="ประวัติทั้งหมด">
+            <ChartCard title="ALL EVENTS">
               <HistoryTable runs={runs} actions={actions} />
             </ChartCard>
           </>
@@ -205,20 +210,13 @@ export function History() {
   );
 }
 
-const tooltipStyle = {
-  background: "rgba(255,255,255,0.92)",
-  backdropFilter: "blur(8px)",
-  border: "1px solid rgba(255,255,255,0.7)",
-  borderRadius: 12,
-  boxShadow: "0 8px 24px -8px rgba(15,92,66,0.18)",
-  fontSize: 12,
-};
-
 function ChartCard({ title, right, children }) {
   return (
-    <section className="glass rounded-3xl p-5 sm:p-6 animate-fade-up">
+    <section className="surface rounded-3xl p-5 sm:p-6 animate-fade-up">
       <div className="flex items-center justify-between mb-4 gap-2">
-        <h2 className="text-base sm:text-lg font-bold text-plant-900">{title}</h2>
+        <h2 className="font-display text-base sm:text-lg font-bold text-forest-900 tracking-wider">
+          {title}
+        </h2>
         {right}
       </div>
       {children}
@@ -226,22 +224,31 @@ function ChartCard({ title, right, children }) {
   );
 }
 
-function Stat({ label, value, suffix, gradient }) {
+const accentMap = {
+  plant: "from-plant-500 to-plant-700",
+  strava: "from-sun-400 to-strava",
+  water: "from-sky2-400 to-sky2-600",
+  sun: "from-sun-300 to-sun-500",
+};
+
+function Stat({ label, value, suffix, accent }) {
   return (
-    <div className="glass rounded-2xl p-3.5 sm:p-4 animate-fade-up">
-      <div className="text-[11px] uppercase tracking-wide text-plant-800/55 font-medium">{label}</div>
-      <div className={`mt-1 flex items-baseline gap-1 ${gradient}`}>
-        <span className="text-xl sm:text-2xl font-extrabold tracking-tight">{value}</span>
-        <span className="text-xs sm:text-sm font-semibold opacity-80">{suffix}</span>
+    <div className="surface rounded-2xl p-4 animate-fade-up">
+      <div className="label-eyebrow">{label}</div>
+      <div className="mt-1.5 flex items-baseline gap-1.5">
+        <span
+          className={`stat-num text-2xl sm:text-3xl bg-gradient-to-r ${accentMap[accent]} bg-clip-text text-transparent`}
+        >
+          {value}
+        </span>
+        <span className="text-[10px] font-bold tracking-[0.15em] text-forest-500">{suffix}</span>
       </div>
     </div>
   );
 }
 
 function Empty({ text }) {
-  return (
-    <div className="h-40 flex items-center justify-center text-sm text-plant-800/50">{text}</div>
-  );
+  return <div className="h-40 flex items-center justify-center text-sm text-forest-400">{text}</div>;
 }
 
 function HistoryTable({ runs, actions }) {
@@ -250,10 +257,10 @@ function HistoryTable({ runs, actions }) {
     <div>
       <div className="flex gap-1.5 mb-3">
         <TabBtn active={tab === "run"} onClick={() => setTab("run")}>
-          🏃 การวิ่ง ({runs.length})
+          🏃 RUNS · {runs.length}
         </TabBtn>
         <TabBtn active={tab === "action"} onClick={() => setTab("action")}>
-          🌿 คำสั่ง ({actions.length})
+          🌿 ACTIONS · {actions.length}
         </TabBtn>
       </div>
       {tab === "run" ? <RunList runs={runs} /> : <ActionList actions={actions} />}
@@ -265,10 +272,10 @@ function TabBtn({ active, onClick, children }) {
   return (
     <button
       onClick={onClick}
-      className={`px-3 py-1.5 rounded-lg text-sm transition ${
+      className={`px-3 py-1.5 rounded-lg text-[11px] font-bold tracking-wider transition ${
         active
-          ? "bg-gradient-to-br from-plant-500 to-plant-700 text-white font-semibold shadow-glow-plant"
-          : "bg-white/60 text-plant-800/70 hover:bg-white/80"
+          ? "bg-gradient-to-r from-plant-400 to-plant-600 text-white shadow-glow-plant"
+          : "surface-flat text-forest-600 hover:text-forest-900"
       }`}
     >
       {children}
@@ -279,12 +286,12 @@ function TabBtn({ active, onClick, children }) {
 function RunList({ runs }) {
   if (!runs.length) return <Empty text="ไม่มีรายการ" />;
   return (
-    <ul className="divide-y divide-white/50 text-sm max-h-72 overflow-auto">
+    <ul className="divide-y divide-white/60 text-sm max-h-72 overflow-auto">
       {runs.map((r) => (
         <li key={r.id} className="py-2.5 flex items-center justify-between gap-2 px-1">
-          <span className="text-plant-800/80">{formatDate(r.runAt)}</span>
-          <span className="text-plant-800/70 font-mono">{(r.distanceKm ?? 0).toFixed(2)} กม.</span>
-          <span className="text-point font-bold">+{r.pointsEarned ?? 0}</span>
+          <span className="text-forest-600 font-mono text-xs">{formatDate(r.runAt)}</span>
+          <span className="text-forest-800 font-mono">{(r.distanceKm ?? 0).toFixed(2)} km</span>
+          <span className="text-point font-bold font-mono">+{r.pointsEarned ?? 0}</span>
         </li>
       ))}
     </ul>
@@ -292,18 +299,20 @@ function RunList({ runs }) {
 }
 
 function ActionList({ actions }) {
-  const label = { water: "💧 รดน้ำ", fertilizer: "🌿 ให้ปุ๋ย" };
+  const label = { water: "💧 WATER", fertilizer: "🌿 FERT" };
   if (!actions.length) return <Empty text="ไม่มีรายการ" />;
   return (
-    <ul className="divide-y divide-white/50 text-sm max-h-72 overflow-auto">
+    <ul className="divide-y divide-white/60 text-sm max-h-72 overflow-auto">
       {actions.map((a) => (
         <li key={a.id} className="py-2.5 flex items-center justify-between gap-2 px-1">
-          <span className="text-plant-800/80">{label[a.actionType] ?? a.actionType}</span>
-          <span className="text-xs text-plant-800/50 hidden sm:inline">
+          <span className="text-forest-700 font-bold tracking-wider text-xs">
+            {label[a.actionType] ?? a.actionType}
+          </span>
+          <span className="text-[11px] text-forest-500 font-mono hidden sm:inline">
             {formatDate(a.createdAt)}
           </span>
           <span className="flex items-center gap-2">
-            <span className="text-point text-xs font-bold">−{a.pointsDeducted}</span>
+            <span className="text-point text-xs font-bold font-mono">−{a.pointsDeducted}</span>
             <StatusPill status={a.status} />
           </span>
         </li>
@@ -314,12 +323,18 @@ function ActionList({ actions }) {
 
 function StatusPill({ status }) {
   const style = {
-    pending: "bg-gray-100 text-gray-600 border-gray-200",
-    executing: "bg-sky-100 text-sky-700 border-sky-200",
-    success: "bg-plant-100 text-plant-800 border-plant-200",
-    failed: "bg-red-100 text-red-700 border-red-200",
+    pending: "bg-white/55 text-forest-500 border-white/70",
+    executing: "bg-sky2-100/70 text-sky2-600 border-sky2-300/60",
+    success: "bg-plant-100/70 text-plant-700 border-plant-300/60",
+    failed: "bg-rose-100/70 text-rose-700 border-rose-300/60",
   }[status];
-  return <span className={`text-[10px] px-1.5 py-0.5 rounded-md border ${style}`}>{status}</span>;
+  return (
+    <span
+      className={`text-[9px] font-bold tracking-wider px-1.5 py-0.5 rounded-md border uppercase ${style}`}
+    >
+      {status}
+    </span>
+  );
 }
 
 function aggregateRunsByDay(runs, days) {

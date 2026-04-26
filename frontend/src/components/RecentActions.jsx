@@ -1,53 +1,64 @@
 const statusStyle = {
-  pending: "bg-gray-100 text-gray-600 border-gray-200",
-  executing: "bg-sky-100 text-sky-700 border-sky-200",
-  success: "bg-plant-100 text-plant-800 border-plant-200",
-  failed: "bg-red-100 text-red-700 border-red-200",
+  pending: "bg-white/55 text-forest-500 border-white/70",
+  executing: "bg-sky2-100/70 text-sky2-600 border-sky2-300/60",
+  success: "bg-plant-100/70 text-plant-700 border-plant-300/60",
+  failed: "bg-rose-100/70 text-rose-700 border-rose-300/60",
 };
 
 const statusLabel = {
-  pending: "รอคิว",
-  executing: "กำลังทำงาน",
-  success: "สำเร็จ",
-  failed: "ล้มเหลว",
+  pending: "QUEUED",
+  executing: "RUNNING",
+  success: "DONE",
+  failed: "FAILED",
 };
 
-const typeLabel = { water: { emoji: "💧", text: "รดน้ำ" }, fertilizer: { emoji: "🌿", text: "ให้ปุ๋ย" } };
+const typeLabel = {
+  water: { emoji: "💧", text: "WATER", accent: "text-sky2-600" },
+  fertilizer: { emoji: "🌿", text: "FERTILIZE", accent: "text-sun-500" },
+};
 
 export function RecentActions({ items }) {
   if (!items?.length) {
     return (
-      <div className="glass rounded-2xl p-6 text-sm text-plant-800/60 text-center">
-        <div className="text-3xl mb-2" aria-hidden>📭</div>
-        ยังไม่มีประวัติการสั่งงาน
+      <div className="surface rounded-2xl p-8 text-sm text-forest-400 text-center">
+        <div className="text-3xl mb-2 opacity-60" aria-hidden>📭</div>
+        <div className="label-eyebrow">NO ACTIVITY YET</div>
       </div>
     );
   }
   return (
-    <section className="glass rounded-2xl overflow-hidden animate-fade-up">
-      <div className="px-5 py-3 border-b border-white/60 flex items-center justify-between">
-        <h3 className="font-bold text-plant-900">ประวัติล่าสุด</h3>
-        <span className="text-xs text-plant-800/50">{items.length} รายการ</span>
+    <section className="surface rounded-2xl overflow-hidden animate-fade-up">
+      <div className="px-5 py-3.5 border-b border-white/70 flex items-center justify-between">
+        <h3 className="font-display font-bold text-forest-900 tracking-wider">RECENT ACTIVITY</h3>
+        <span className="font-mono text-[10px] text-forest-500 tracking-wider">
+          {String(items.length).padStart(2, "0")} EVENTS
+        </span>
       </div>
-      <ul className="divide-y divide-white/50">
+      <ul className="divide-y divide-white/60">
         {items.map((a) => {
-          const t = typeLabel[a.actionType] ?? { emoji: "•", text: a.actionType };
+          const t = typeLabel[a.actionType] ?? { emoji: "•", text: a.actionType, accent: "text-forest-600" };
           return (
-            <li key={a.id} className="px-5 py-3 flex items-center justify-between gap-3 text-sm hover:bg-white/40 transition">
+            <li
+              key={a.id}
+              className="px-5 py-3 flex items-center justify-between gap-3 text-sm hover:bg-white/40 transition"
+            >
               <div className="flex items-center gap-3 min-w-0">
-                <span className="h-9 w-9 grid place-items-center rounded-xl bg-white/70 border border-white/80 text-base shadow-soft" aria-hidden>
+                <span
+                  className="h-9 w-9 grid place-items-center rounded-xl surface-flat text-base shrink-0"
+                  aria-hidden
+                >
                   {t.emoji}
                 </span>
                 <div className="min-w-0">
-                  <div className="font-semibold text-plant-900">{t.text}</div>
-                  <div className="text-[11px] text-plant-800/50">
+                  <div className={`font-bold tracking-wider text-xs ${t.accent}`}>{t.text}</div>
+                  <div className="text-[11px] text-forest-500 font-mono mt-0.5">
                     {new Date(a.createdAt).toLocaleString("th-TH")}
                   </div>
                 </div>
               </div>
               <div className="flex items-center gap-2 shrink-0">
-                <span className="text-point text-xs font-bold">−{a.pointsDeducted}</span>
-                <span className={`chip border ${statusStyle[a.status] ?? "bg-gray-100"}`}>
+                <span className="font-mono text-xs font-bold text-point">−{a.pointsDeducted}</span>
+                <span className={`chip border ${statusStyle[a.status] ?? "bg-white/40"}`}>
                   {statusLabel[a.status] ?? a.status}
                 </span>
               </div>

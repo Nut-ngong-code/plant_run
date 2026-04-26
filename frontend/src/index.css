@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700;800&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap");
 
 @tailwind base;
 @tailwind components;
@@ -13,52 +13,84 @@ html, body, #root {
 }
 
 body {
-  @apply text-plant-900 font-sans;
+  @apply text-forest-900 font-sans antialiased;
   margin: 0;
-  background: #F4F7F1;
+  background: #F4FAF5;
   background-image:
-    radial-gradient(ellipse 60% 40% at 0% 0%, rgba(133, 212, 166, 0.35) 0%, transparent 60%),
-    radial-gradient(ellipse 50% 35% at 100% 5%, rgba(244, 185, 64, 0.18) 0%, transparent 60%),
-    radial-gradient(ellipse 70% 50% at 50% 100%, rgba(101, 137, 87, 0.20) 0%, transparent 65%),
-    linear-gradient(180deg, #F4F7F1 0%, #FBF9F2 60%, #F0FAF5 100%);
+    radial-gradient(ellipse 60% 40% at 0% 0%, rgba(125, 211, 252, 0.40) 0%, transparent 60%),
+    radial-gradient(ellipse 50% 35% at 100% 0%, rgba(255, 179, 71, 0.22) 0%, transparent 60%),
+    radial-gradient(ellipse 70% 50% at 50% 100%, rgba(94, 214, 145, 0.32) 0%, transparent 65%),
+    linear-gradient(180deg, #F4FAF5 0%, #FAFEFB 60%, #EFF8F2 100%);
   background-attachment: fixed;
 }
 
+::selection {
+  background: rgba(14, 161, 90, 0.25);
+  color: #0B1F18;
+}
+
 @layer components {
-  .glass {
-    @apply bg-white/70 backdrop-blur-md border border-white/60 shadow-glass;
+  .surface {
+    @apply bg-white/55 backdrop-blur-md border border-white/70 shadow-glass;
   }
-  .glass-strong {
-    @apply bg-white/85 backdrop-blur-xl border border-white/70 shadow-glass-lg;
+  .surface-elev {
+    @apply bg-white/70 backdrop-blur-xl border border-white/80 shadow-glass-lg;
+  }
+  .surface-flat {
+    @apply bg-white/40 border border-white/60;
   }
   .chip {
-    @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium;
+    @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em];
   }
   .btn-primary {
-    @apply rounded-xl px-4 py-2.5 text-sm font-semibold text-white
-           bg-gradient-to-br from-plant-500 to-plant-700 shadow-glow-plant
-           hover:from-plant-400 hover:to-plant-600 active:scale-[0.98]
-           disabled:from-gray-300 disabled:to-gray-400 disabled:shadow-none disabled:cursor-not-allowed
+    @apply rounded-xl px-4 py-2.5 text-sm font-bold uppercase tracking-wider text-white
+           bg-gradient-to-r from-plant-400 to-plant-600
+           shadow-glow-plant hover:from-plant-300 hover:to-plant-500 active:scale-[0.97]
+           disabled:from-paper-300 disabled:to-paper-300 disabled:text-forest-400 disabled:shadow-none disabled:cursor-not-allowed
            transition-all duration-200;
   }
   .btn-strava {
-    @apply rounded-xl px-4 py-3 font-semibold text-white
-           bg-gradient-to-br from-orange-500 to-strava shadow-glow-strava
-           hover:brightness-105 active:scale-[0.98]
-           disabled:opacity-60 disabled:shadow-none
+    @apply rounded-xl px-4 py-3 font-bold text-white uppercase tracking-[0.15em] text-sm
+           bg-gradient-to-br from-sun-400 to-strava
+           shadow-glow-strava hover:brightness-105 active:scale-[0.97]
+           disabled:opacity-50 disabled:shadow-none disabled:cursor-not-allowed
            transition-all duration-200;
   }
   .btn-ghost {
-    @apply rounded-xl px-3 py-2 text-sm text-plant-800/80 hover:bg-white/60 transition;
+    @apply rounded-xl px-3 py-2 text-sm text-forest-500 hover:bg-white/55 hover:text-forest-800 transition;
+  }
+  .btn-outline {
+    @apply rounded-xl px-4 py-2.5 text-sm font-semibold text-forest-700
+           border border-forest-200 bg-white/45
+           hover:bg-white/70 hover:border-plant-400 hover:text-plant-700
+           active:scale-[0.97] transition;
   }
   .grad-text {
-    @apply bg-gradient-to-br from-plant-600 to-sage-500 bg-clip-text text-transparent;
+    @apply bg-gradient-to-r from-plant-500 to-plant-700 bg-clip-text text-transparent;
   }
-  .grad-text-sun {
-    @apply bg-gradient-to-br from-sun to-bark-500 bg-clip-text text-transparent;
+  .grad-text-water {
+    @apply bg-gradient-to-r from-sky2-400 to-sky2-600 bg-clip-text text-transparent;
   }
   .grad-text-strava {
-    @apply bg-gradient-to-br from-orange-500 to-strava bg-clip-text text-transparent;
+    @apply bg-gradient-to-r from-sun-400 to-strava bg-clip-text text-transparent;
+  }
+  .grad-text-sun {
+    @apply bg-gradient-to-r from-sun-300 to-sun-500 bg-clip-text text-transparent;
+  }
+  .stat-num {
+    @apply font-display font-bold tracking-tight tabular-nums;
+  }
+  .label-eyebrow {
+    @apply text-[10px] uppercase tracking-[0.22em] text-forest-500 font-semibold;
+  }
+  .divider {
+    @apply h-px bg-gradient-to-r from-transparent via-forest-200/60 to-transparent;
+  }
+  .data-input {
+    @apply w-full bg-white/65 border border-white/80 rounded-xl px-3.5 py-2.5
+           text-forest-900 placeholder:text-forest-400
+           focus:outline-none focus:ring-2 focus:ring-plant-400/40 focus:border-plant-400
+           transition;
   }
 }
 
@@ -69,3 +101,27 @@ body {
     transition-duration: 0.001ms !important;
   }
 }
+
+/* Recharts light theme overrides */
+.recharts-cartesian-axis-tick text { fill: #5E8267 !important; font-size: 11px; }
+.recharts-cartesian-grid-horizontal line,
+.recharts-cartesian-grid-vertical line {
+  stroke: rgba(15, 42, 30, 0.08) !important;
+}
+.recharts-default-tooltip {
+  background: rgba(255, 255, 255, 0.92) !important;
+  border: 1px solid rgba(255, 255, 255, 0.75) !important;
+  border-radius: 12px !important;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 8px 24px -8px rgba(15, 42, 30, 0.18) !important;
+}
+.recharts-tooltip-label, .recharts-tooltip-item, .recharts-tooltip-item-name, .recharts-tooltip-item-value {
+  color: #1F3527 !important;
+}
+.recharts-legend-item-text { color: #2E4A36 !important; }
+
+/* Soft scrollbar */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(94, 130, 103, 0.35); border-radius: 8px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(46, 74, 54, 0.55); }

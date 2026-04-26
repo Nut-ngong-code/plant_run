@@ -27,9 +27,11 @@ export function AuthCallback() {
     <>
       <GardenBackdrop />
       <main className="min-h-screen flex items-center justify-center px-4">
-        <div className="glass rounded-2xl px-6 py-5 text-plant-800/70 flex items-center gap-3">
-          <span className="inline-block h-2 w-2 rounded-full bg-plant-500 animate-pulse" />
-          กำลังเชื่อมต่อกับ Strava…
+        <div className="surface rounded-2xl px-6 py-5 flex items-center gap-3">
+          <span className="inline-block h-2 w-2 rounded-full bg-strava shadow-[0_0_10px_rgba(252,76,2,0.7)] animate-pulse" />
+          <span className="font-mono text-sm text-forest-700 tracking-wider">
+            CONNECTING TO STRAVA…
+          </span>
         </div>
       </main>
     </>

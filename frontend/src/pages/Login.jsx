@@ -25,46 +25,55 @@ export function Login() {
     <>
       <GardenBackdrop />
       <main className="min-h-screen flex items-center justify-center px-4 py-10">
-        <div className="glass-strong rounded-3xl p-7 sm:p-9 w-full max-w-md text-center relative overflow-hidden animate-fade-up">
-          {/* corner gradient */}
-          <div className="pointer-events-none absolute -top-24 -right-24 h-56 w-56 rounded-full bg-gradient-to-br from-plant-200/60 to-sun/30 blur-3xl" />
-          <div className="pointer-events-none absolute -bottom-20 -left-20 h-44 w-44 rounded-full bg-gradient-to-tr from-sage-200/60 to-cream-100/60 blur-3xl" />
+        <div className="surface-elev rounded-3xl p-8 sm:p-10 w-full max-w-md text-center relative overflow-hidden animate-fade-up">
+          {/* corner accents */}
+          <div className="pointer-events-none absolute -top-32 -right-24 h-72 w-72 rounded-full bg-plant-200/55 blur-3xl" />
+          <div className="pointer-events-none absolute -bottom-24 -left-24 h-56 w-56 rounded-full bg-sky2-200/55 blur-3xl" />
+          <div className="pointer-events-none absolute -top-24 -left-32 h-44 w-44 rounded-full bg-sun-100/65 blur-3xl" />
 
           <div className="relative">
-            <div className="flex justify-center mb-3">
+            <div className="flex justify-center mb-2">
               <PlantGraphic mood="happy" size={120} />
             </div>
-            <span className="chip bg-plant-100/80 text-plant-800 border border-plant-200/60 mb-2">
-              <span className="h-1.5 w-1.5 rounded-full bg-plant-500 animate-pulse" />
-              วิ่ง · ปลูก · เติบโต
+            <span className="chip surface-flat text-plant-700 mb-3">
+              <span className="h-1.5 w-1.5 rounded-full bg-plant-500 shadow-[0_0_8px_rgba(14,161,90,0.6)] animate-pulse" />
+              RUN · GROW · REPEAT
             </span>
-            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-plant-900 mt-2">
-              วิ่งเพื่อชีวิต<span className="grad-text">ต้นไม้</span>
+            <h1 className="font-display text-3xl sm:text-4xl font-bold tracking-tight text-forest-900 mt-3 leading-tight">
+              RUN<span className="grad-text">→</span>GROW
             </h1>
-            <p className="text-sm text-plant-800/60 mt-3 leading-relaxed">
-              ทุกกิโลเมตรที่คุณวิ่ง = แต้มที่ต้นไม้รอใช้รดน้ำ<br className="hidden sm:inline" />
-              เริ่มต้นด้วยการเชื่อม Strava
+            <p className="text-sm text-forest-600 mt-3 leading-relaxed">
+              ทุกกิโลเมตรที่คุณวิ่ง = แต้มที่ต้นไม้รอใช้รดน้ำ
+              <br className="hidden sm:inline" />
+              <span className="text-forest-500">เริ่มต้นด้วยการเชื่อม Strava</span>
             </p>
 
-            <button onClick={connectStrava} className="btn-strava w-full mt-6 flex items-center justify-center gap-2">
+            <button
+              onClick={connectStrava}
+              className="btn-strava w-full mt-7 flex items-center justify-center gap-2.5"
+            >
               <StravaMark />
-              <span>เชื่อมต่อกับ Strava</span>
+              <span>CONNECT WITH STRAVA</span>
             </button>
 
-            <div className="mt-7 pt-5 border-t border-white/60">
-              <p className="text-xs text-plant-800/50">หรือทดสอบด้วย userId (dev mode)</p>
-              <form onSubmit={devLogin} className="mt-2.5 flex flex-col xs:flex-row gap-2">
+            <div className="mt-7 pt-6 border-t border-white/70">
+              <div className="label-eyebrow mb-2.5">DEV MODE — USER ID LOGIN</div>
+              <form onSubmit={devLogin} className="flex flex-col xs:flex-row gap-2">
                 <input
                   type="number"
                   min="1"
                   inputMode="numeric"
                   value={devId}
                   onChange={(e) => setDevId(e.target.value)}
-                  placeholder="เช่น 1"
-                  className="flex-1 bg-white/80 border border-white/70 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-plant-300 focus:border-plant-300 transition"
+                  placeholder="1"
+                  className="data-input flex-1 font-mono text-center"
                 />
-                <button type="submit" disabled={!devId} className="btn-primary disabled:cursor-not-allowed">
-                  เข้าสู่ระบบ
+                <button
+                  type="submit"
+                  disabled={!devId}
+                  className="btn-primary disabled:cursor-not-allowed"
+                >
+                  ENTER
                 </button>
               </form>
             </div>

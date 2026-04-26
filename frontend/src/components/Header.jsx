@@ -3,9 +3,9 @@ import { Link, NavLink, useNavigate } from "react-router-dom";
 import { clearUserId } from "../lib/session.js";
 
 const links = [
-  { to: "/", label: "แดชบอร์ด", end: true },
-  { to: "/devices/new", label: "เพิ่มกระถาง" },
-  { to: "/history", label: "ประวัติ" },
+  { to: "/", label: "DASHBOARD", end: true },
+  { to: "/devices/new", label: "DEVICES" },
+  { to: "/history", label: "HISTORY" },
 ];
 
 export function Header({ user }) {
@@ -26,36 +26,39 @@ export function Header({ user }) {
   };
 
   const navClass = ({ isActive }) =>
-    `relative px-3 py-1.5 rounded-lg text-sm transition ${
+    `relative px-3 py-1.5 rounded-lg text-[11px] font-bold tracking-[0.18em] transition ${
       isActive
-        ? "text-plant-800 font-semibold bg-white/70 shadow-soft"
-        : "text-plant-800/70 hover:text-plant-800 hover:bg-white/50"
+        ? "text-plant-700 bg-plant-100/80 border border-plant-300/50"
+        : "text-forest-500 hover:text-forest-800 hover:bg-white/55 border border-transparent"
     }`;
 
   return (
     <header
-      className={`sticky top-0 z-20 transition-all duration-300 ${
+      className={`sticky top-0 z-30 transition-all duration-300 ${
         scrolled
-          ? "bg-white/70 backdrop-blur-xl border-b border-white/60 shadow-soft"
-          : "bg-white/40 backdrop-blur-md border-b border-transparent"
+          ? "bg-white/65 backdrop-blur-xl border-b border-white/70 shadow-soft"
+          : "bg-white/30 backdrop-blur-md border-b border-transparent"
       }`}
     >
-      <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between gap-2">
+      <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between gap-2">
         <Link
           to="/"
           className="flex items-center gap-2.5 min-w-0 group"
           onClick={() => setMenuOpen(false)}
         >
-          <span className="grid place-items-center h-9 w-9 rounded-xl bg-gradient-to-br from-plant-400 to-plant-700 shadow-glow-plant text-white text-lg group-hover:scale-105 transition" aria-hidden>
-            🌱
+          <span
+            className="grid place-items-center h-9 w-9 rounded-xl bg-gradient-to-br from-plant-400 to-plant-600 shadow-glow-plant text-white font-black text-sm group-hover:scale-105 transition"
+            aria-hidden
+          >
+            R⇢
           </span>
-          <span className="font-bold text-plant-800 truncate hidden xs:inline">
-            วิ่งเพื่อชีวิต<span className="grad-text">ต้นไม้</span>
+          <span className="font-display font-bold text-forest-900 truncate hidden xs:inline tracking-wide">
+            RUN<span className="grad-text">→</span>GROW
           </span>
         </Link>
 
         {user && (
-          <nav className="hidden md:flex items-center gap-1">
+          <nav className="hidden md:flex items-center gap-1.5">
             {links.map((l) => (
               <NavLink key={l.to} to={l.to} end={l.end} className={navClass}>
                 {l.label}
@@ -67,20 +70,22 @@ export function Header({ user }) {
         <div className="flex items-center gap-2">
           {user && (
             <>
-              <span className="hidden sm:inline-flex items-center gap-2 chip bg-white/60 border border-white/70 text-plant-800">
-                <span className="h-2 w-2 rounded-full bg-plant-500 animate-pulse" />
-                <span className="max-w-[140px] truncate">{user.displayName ?? "นักวิ่ง"}</span>
+              <span className="hidden sm:inline-flex items-center gap-2 chip surface-flat text-forest-700">
+                <span className="h-1.5 w-1.5 rounded-full bg-plant-500 shadow-[0_0_8px_rgba(14,161,90,0.6)] animate-pulse" />
+                <span className="max-w-[140px] truncate normal-case tracking-normal text-xs font-medium">
+                  {user.displayName ?? "RUNNER"}
+                </span>
               </span>
               <button
                 onClick={logout}
-                className="hidden md:inline btn-ghost"
+                className="hidden md:inline btn-ghost text-[11px] uppercase tracking-wider"
                 title="ออกจากระบบ"
               >
-                ออกจากระบบ
+                LOGOUT
               </button>
               <button
                 onClick={() => setMenuOpen((v) => !v)}
-                className="md:hidden p-2 rounded-lg hover:bg-white/60"
+                className="md:hidden p-2 rounded-lg hover:bg-white/55 text-forest-700"
                 aria-label="เมนู"
               >
                 <HamburgerIcon open={menuOpen} />
@@ -91,8 +96,8 @@ export function Header({ user }) {
       </div>
 
       {user && menuOpen && (
-        <nav className="md:hidden border-t border-white/60 bg-white/80 backdrop-blur-xl">
-          <div className="max-w-5xl mx-auto px-4 py-2 flex flex-col">
+        <nav className="md:hidden border-t border-white/70 bg-white/85 backdrop-blur-xl">
+          <div className="max-w-6xl mx-auto px-4 py-2 flex flex-col">
             {links.map((l) => (
               <NavLink
                 key={l.to}
@@ -100,8 +105,10 @@ export function Header({ user }) {
                 end={l.end}
                 onClick={() => setMenuOpen(false)}
                 className={({ isActive }) =>
-                  `px-3 py-2.5 rounded-lg text-sm ${
-                    isActive ? "bg-plant-100 text-plant-800 font-semibold" : "text-plant-800/80"
+                  `px-3 py-2.5 rounded-lg text-sm font-semibold tracking-wider ${
+                    isActive
+                      ? "bg-plant-100 text-plant-700 border border-plant-300/40"
+                      : "text-forest-600 border border-transparent"
                   }`
                 }
               >
@@ -110,9 +117,9 @@ export function Header({ user }) {
             ))}
             <button
               onClick={logout}
-              className="mt-1 px-3 py-2.5 text-sm text-left text-gray-500 hover:text-gray-800"
+              className="mt-1 px-3 py-2.5 text-sm text-left text-forest-500 hover:text-forest-800"
             >
-              ออกจากระบบ
+              LOGOUT
             </button>
           </div>
         </nav>

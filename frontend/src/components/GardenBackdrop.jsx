@@ -1,14 +1,18 @@
-// Floating leaf/blob decorations for page backdrops.
-// Pure SVG, fixed position, pointer-events none.
+// Bright nature backdrop: organic pastel blobs + a few floating leaves.
+// Pure SVG / fixed position / pointer-events none.
 export function GardenBackdrop() {
   return (
     <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden" aria-hidden>
-      <Blob className="absolute -top-24 -left-20 w-[420px] opacity-50 animate-float-slow" fill="#B6E7C9" />
-      <Blob className="absolute -top-10 right-[-120px] w-[360px] opacity-40 animate-float" fill="#F5F0E0" />
-      <Blob className="absolute bottom-[-160px] left-1/3 w-[520px] opacity-35 animate-float-slow" fill="#CADBBC" />
-      <Leaf className="absolute top-[14%] right-[8%] w-20 opacity-50 animate-sway" />
-      <Leaf className="absolute top-[55%] left-[4%] w-24 opacity-40 animate-sway" rotate={-30} />
-      <Leaf className="absolute bottom-[10%] right-[12%] w-16 opacity-50 animate-sway" rotate={150} />
+      <Blob className="absolute -top-24 -left-20 w-[460px] opacity-55 animate-float-slow" fill="#B5E1F5" />
+      <Blob className="absolute -top-10 right-[-120px] w-[380px] opacity-50 animate-float" fill="#FFE6BC" />
+      <Blob className="absolute bottom-[-160px] left-1/3 w-[540px] opacity-45 animate-float-slow" fill="#94E9B5" />
+
+      <Leaf className="absolute top-[14%] right-[8%] w-20 opacity-55 animate-sway" />
+      <Leaf className="absolute top-[55%] left-[4%] w-24 opacity-45 animate-sway" rotate={-30} />
+      <Leaf className="absolute bottom-[10%] right-[12%] w-16 opacity-55 animate-sway" rotate={150} />
+
+      {/* faint horizon line */}
+      <div className="absolute left-0 right-0 top-[40%] h-px bg-gradient-to-r from-transparent via-plant-400/20 to-transparent" />
     </div>
   );
 }
@@ -28,17 +32,23 @@ function Blob({ className, fill }) {
 function Leaf({ className, rotate = 0 }) {
   return (
     <svg viewBox="0 0 64 64" className={className} style={{ transform: `rotate(${rotate}deg)` }}>
+      <defs>
+        <linearGradient id="leafG" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#5FD491" />
+          <stop offset="100%" stopColor="#076635" />
+        </linearGradient>
+      </defs>
       <path
         d="M32 4 C 14 12, 6 30, 12 52 C 32 50, 52 36, 56 12 C 48 8, 40 6, 32 4 Z"
         fill="url(#leafG)"
       />
-      <path d="M22 44 Q 32 30, 50 16" stroke="#157554" strokeWidth="1.2" fill="none" opacity="0.45" />
-      <defs>
-        <linearGradient id="leafG" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor="#85D4A6" />
-          <stop offset="100%" stopColor="#157554" />
-        </linearGradient>
-      </defs>
+      <path
+        d="M22 44 Q 32 30, 50 16"
+        stroke="#076635"
+        strokeWidth="1.2"
+        fill="none"
+        opacity="0.5"
+      />
     </svg>
   );
 }
