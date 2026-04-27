@@ -17,7 +17,7 @@ code/
 
 ## Stack
 
-- **DB**: MySQL 8 (Docker), `plant_dev / devpassword123 / plant_run_db` @ :3306
+- **DB**: MySQL 8 (Docker),  @ :3306
 - **Backend**: Node 18.19.1, pnpm 10, ESM, Express 5, Prisma 6, `node --watch` for dev → :3000
 - **Frontend**: Vite 5 (proxy `/api` + `/health` → :3000), React Router (lazy routes), Axios → :5173
 - **Hardware**: ESP32 + Relay + ปั๊มน้ำ + Solenoid Valve + Soil Moisture Sensor
