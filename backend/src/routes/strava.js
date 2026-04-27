@@ -17,15 +17,49 @@ const ensureConfigured = () => {
   }
 };
 
-// GET /api/auth/strava/login → redirect ไปหน้าล็อกอิน Strava
-stravaRouter.get("/login", (_req, res) => {
+// Allow the frontend to come back to whatever origin it actually loaded from
+// (Vite may bind 5173, 5174, ...). Only localhost is permitted to avoid
+// turning this into an open redirect.
+function safeReturnTo(raw) {
+  if (typeof raw !== "string" || !raw) return null;
+  try {
+    const u = new URL(raw);
+    if (u.protocol !== "http:" && u.protocol !== "https:") return null;
+    if (u.hostname !== "localhost" && u.hostname !== "127.0.0.1") return null;
+    return u.origin;
+  } catch {
+    return null;
+  }
+}
+
+function encodeState(payload) {
+  return Buffer.from(JSON.stringify(payload), "utf8").toString("base64url");
+}
+
+function decodeState(raw) {
+  if (typeof raw !== "string" || !raw) return {};
+  try {
+    return JSON.parse(Buffer.from(raw, "base64url").toString("utf8"));
+  } catch {
+    return {};
+  }
+}
+
+// GET /api/auth/strava/login?return_to=... → redirect ไปหน้าล็อกอิน Strava
+// `return_to` is the frontend origin the user should land back on after callback.
+// Encoded into the OAuth `state` parameter (Strava preserves and echoes it).
+stravaRouter.get("/login", (req, res) => {
   ensureConfigured();
+  const returnTo = safeReturnTo(req.query.return_to);
+  const state = encodeState({ returnTo: returnTo ?? null });
+
   const params = new URLSearchParams({
     client_id: config.strava.clientId,
     redirect_uri: config.strava.redirectUri,
     response_type: "code",
     approval_prompt: "auto",
     scope: "read,activity:read_all",
+    state,
   });
   res.redirect(`${STRAVA_AUTH}?${params.toString()}`);
 });
@@ -72,7 +106,10 @@ stravaRouter.get("/callback", async (req, res) => {
 
   // Redirect กลับไปที่ frontend พร้อม userId ใน query string
   // (เวอร์ชัน prototype ไม่มี JWT — frontend เก็บ userId ใน localStorage)
-  const redirectUrl = new URL("/auth/callback", config.frontendUrl);
+  // ใช้ returnTo จาก state ถ้ามี (รับ port จริงจาก Vite) ไม่งั้น fallback เป็น FRONTEND_URL
+  const { returnTo } = decodeState(req.query.state);
+  const base = safeReturnTo(returnTo) ?? config.frontendUrl;
+  const redirectUrl = new URL("/auth/callback", base);
   redirectUrl.searchParams.set("userId", String(user.id));
   res.redirect(redirectUrl.toString());
 });
