@@ -1,15 +1,15 @@
 import { useState } from "react";
 import { moodFromStatus, PlantGraphic } from "./PlantGraphic.jsx";
 import { MoistureGauge } from "./MoistureGauge.jsx";
-import { rotateDeviceToken } from "../api/endpoints.js";
+import { rotateDeviceToken, deleteDevice } from "../api/endpoints.js";
 
 const COST = { water: 15, fertilizer: 20 };
 
-export function PlantCard({ device, totalPoints, onAction, lastSyncedAt, userId }) {
+export function PlantCard({ device, totalPoints, onAction, onDelete, lastSyncedAt, userId }) {
   const [busyType, setBusyType] = useState(null);
   const [errorMsg, setErrorMsg] = useState(null);
-  // Rotate-token state machine: idle | confirm | rotating | issued
-  const [rotateState, setRotateState] = useState("idle");
+  // Overlay mode: idle | confirmRotate | rotating | issued | confirmDelete | deleting
+  const [mode, setMode] = useState("idle");
   const [issuedToken, setIssuedToken] = useState(null);
   const [copied, setCopied] = useState(false);
 
@@ -29,15 +29,28 @@ export function PlantCard({ device, totalPoints, onAction, lastSyncedAt, userId 
   };
 
   const confirmRotate = async () => {
-    setRotateState("rotating");
+    setMode("rotating");
     setErrorMsg(null);
     try {
       const r = await rotateDeviceToken(userId, device.deviceId);
       setIssuedToken(r.deviceToken);
-      setRotateState("issued");
+      setMode("issued");
     } catch (e) {
       setErrorMsg(e.message);
-      setRotateState("idle");
+      setMode("idle");
+    }
+  };
+
+  const confirmDelete = async () => {
+    setMode("deleting");
+    setErrorMsg(null);
+    try {
+      const r = await deleteDevice(userId, device.deviceId);
+      // refresh dashboard ผ่าน parent — การ์ดจะถูกถอดออกจาก list
+      onDelete?.(device.deviceId, r);
+    } catch (e) {
+      setErrorMsg(e.message);
+      setMode("idle");
     }
   };
 
@@ -51,8 +64,8 @@ export function PlantCard({ device, totalPoints, onAction, lastSyncedAt, userId 
     }
   };
 
-  const dismissRotate = () => {
-    setRotateState("idle");
+  const dismissOverlay = () => {
+    setMode("idle");
     setIssuedToken(null);
     setCopied(false);
   };
@@ -81,15 +94,24 @@ export function PlantCard({ device, totalPoints, onAction, lastSyncedAt, userId 
             {device.displayName ?? "MY POT"}
           </h3>
         </div>
-        <div className="flex items-center gap-1.5 shrink-0">
+        <div className="flex items-center gap-1 shrink-0">
           <button
             type="button"
-            onClick={() => setRotateState("confirm")}
+            onClick={() => setMode("confirmRotate")}
             title="Rotate device token"
             className="h-7 w-7 rounded-full flex items-center justify-center text-forest-500 hover:text-forest-800 hover:bg-white/60 transition"
             aria-label="rotate token"
           >
             <KeyIcon />
+          </button>
+          <button
+            type="button"
+            onClick={() => setMode("confirmDelete")}
+            title="Remove this pot"
+            className="h-7 w-7 rounded-full flex items-center justify-center text-forest-500 hover:text-rose-600 hover:bg-rose-50 transition"
+            aria-label="remove pot"
+          >
+            <TrashIcon />
           </button>
           <span
             className={`chip border ${
@@ -110,14 +132,15 @@ export function PlantCard({ device, totalPoints, onAction, lastSyncedAt, userId 
         </div>
       </header>
 
-      {rotateState !== "idle" && (
-        <RotateOverlay
-          state={rotateState}
+      {mode !== "idle" && (
+        <CardOverlay
+          mode={mode}
           token={issuedToken}
           copied={copied}
-          onConfirm={confirmRotate}
+          onRotateConfirm={confirmRotate}
+          onDeleteConfirm={confirmDelete}
           onCopy={copyToken}
-          onDismiss={dismissRotate}
+          onDismiss={dismissOverlay}
         />
       )}
 
@@ -174,10 +197,20 @@ function KeyIcon() {
   );
 }
 
-function RotateOverlay({ state, token, copied, onConfirm, onCopy, onDismiss }) {
+function TrashIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+         strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" />
+      <path d="M10 11v6M14 11v6" />
+    </svg>
+  );
+}
+
+function CardOverlay({ mode, token, copied, onRotateConfirm, onDeleteConfirm, onCopy, onDismiss }) {
   return (
     <div className="absolute inset-0 z-10 rounded-3xl bg-white/85 backdrop-blur-md flex flex-col p-5 gap-4 animate-fade-up">
-      {state === "confirm" && (
+      {mode === "confirmRotate" && (
         <>
           <div className="label-eyebrow text-sun-700">⚠ ROTATE DEVICE TOKEN</div>
           <p className="text-sm text-forest-700 leading-relaxed">
@@ -188,15 +221,15 @@ function RotateOverlay({ state, token, copied, onConfirm, onCopy, onDismiss }) {
             </span>
           </p>
           <div className="mt-auto flex gap-2">
-            <button onClick={onConfirm} className="btn-primary flex-1">CONFIRM</button>
+            <button onClick={onRotateConfirm} className="btn-primary flex-1">CONFIRM</button>
             <button onClick={onDismiss} className="btn-outline flex-1">CANCEL</button>
           </div>
         </>
       )}
-      {state === "rotating" && (
+      {mode === "rotating" && (
         <div className="m-auto label-eyebrow text-plant-600 animate-pulse">ROTATING…</div>
       )}
-      {state === "issued" && (
+      {mode === "issued" && (
         <>
           <div className="label-eyebrow text-plant-700">✓ NEW TOKEN — SHOWN ONCE</div>
           <textarea
@@ -216,6 +249,30 @@ function RotateOverlay({ state, token, copied, onConfirm, onCopy, onDismiss }) {
             I&apos;VE SAVED IT
           </button>
         </>
+      )}
+      {mode === "confirmDelete" && (
+        <>
+          <div className="label-eyebrow text-rose-700">⚠ REMOVE THIS POT</div>
+          <p className="text-sm text-forest-700 leading-relaxed">
+            ลบกระถางออกจากระบบ — ประวัติความชื้น/รดน้ำของกระถางนี้จะหายไปด้วย
+            <br />
+            <span className="text-forest-500 text-xs">
+              แต้มที่หักไว้ของคำสั่งที่ยังไม่ได้รัน (pending/executing) จะถูกคืนให้
+            </span>
+          </p>
+          <div className="mt-auto flex gap-2">
+            <button
+              onClick={onDeleteConfirm}
+              className="flex-1 px-4 py-2.5 rounded-xl font-bold uppercase tracking-wider text-xs text-white bg-gradient-to-br from-rose-500 to-rose-600 hover:from-rose-400 hover:to-rose-500 active:scale-[0.97] transition"
+            >
+              REMOVE
+            </button>
+            <button onClick={onDismiss} className="btn-outline flex-1">CANCEL</button>
+          </div>
+        </>
+      )}
+      {mode === "deleting" && (
+        <div className="m-auto label-eyebrow text-rose-600 animate-pulse">REMOVING…</div>
       )}
     </div>
   );

@@ -127,6 +127,45 @@ deviceRouter.post("/:deviceId/rotate-token", async (req, res) => {
   });
 });
 
+// DELETE /api/device/:deviceId
+// ลบกระถางออกจากระบบ — refund แต้มของ pending/executing actions ก่อนลบ
+// (foreign key cascade ลบ ACTION_LOG / SOIL_LOG / AUTO_SCHEDULE ของ device นี้ทิ้งหมด)
+const deleteBody = z.object({
+  userId: z.number().int().positive(),
+});
+
+deviceRouter.delete("/:deviceId", async (req, res) => {
+  const { deviceId } = req.params;
+  const { userId } = deleteBody.parse(req.body);
+
+  const device = await prisma.device.findUnique({ where: { deviceId } });
+  if (!device) throw new HttpError(404, "Device not registered", { deviceId });
+  if (device.userId !== userId) {
+    throw new HttpError(403, "Device not owned by this user");
+  }
+
+  const result = await prisma.$transaction(async (tx) => {
+    const pending = await tx.actionLog.findMany({
+      where: {
+        deviceId: device.id,
+        status: { in: ["pending", "executing"] },
+      },
+      select: { id: true, pointsDeducted: true },
+    });
+    const refund = pending.reduce((s, a) => s + (a.pointsDeducted ?? 0), 0);
+    if (refund > 0) {
+      await tx.user.update({
+        where: { id: userId },
+        data: { totalPoints: { increment: refund } },
+      });
+    }
+    await tx.device.delete({ where: { id: device.id } });
+    return { refunded: refund, pendingCanceled: pending.length };
+  });
+
+  res.json({ deviceId, ...result });
+});
+
 // POST /api/device — ลงทะเบียน/ผูกอุปกรณ์ + ออก device token ใหม่ (one-time)
 // คืน plaintext token ใน response รอบนี้รอบเดียว — DB เก็บแค่ SHA-256 hash
 deviceRouter.post("/", async (req, res) => {

@@ -39,6 +39,11 @@ export function Dashboard() {
     load();
   };
 
+  const handleDelete = (_deviceId, _result) => {
+    // หลัง delete สำเร็จ — reload dashboard ทั้ง list (refund แต้มจะ reflect ด้วย)
+    load();
+  };
+
   const handleSyncStrava = async () => {
     setSyncing(true);
     setSyncMsg(null);
@@ -156,6 +161,7 @@ export function Dashboard() {
                   device={d}
                   totalPoints={data.user.totalPoints}
                   onAction={handleAction}
+                  onDelete={handleDelete}
                   lastSyncedAt={d.latestMoisture?.recordedAt}
                   userId={userId}
                 />
