@@ -2,7 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 
 import { prisma } from "../lib/prisma.js";
-import { HttpError } from "../middleware/error.js";
+import { requireDeviceAuth } from "../middleware/deviceAuth.js";
 
 export const sensorRouter = Router();
 
@@ -13,13 +13,10 @@ const postBody = z.object({
 
 // POST /api/sensor
 // ESP32 ยิงค่าความชื้นในดินมาเก็บใน SOIL_LOG + อัปเดตสถานะออนไลน์ของ Device
-sensorRouter.post("/", async (req, res) => {
-  const { deviceId, moisturePercent } = postBody.parse(req.body);
-
-  const device = await prisma.device.findUnique({ where: { deviceId } });
-  if (!device) {
-    throw new HttpError(404, "Device not registered", { deviceId });
-  }
+// ต้องแนบ Bearer token ที่ตรงกับ device.authTokenHash (กัน spoofing)
+sensorRouter.post("/", requireDeviceAuth, async (req, res) => {
+  const { moisturePercent } = postBody.parse(req.body);
+  const device = req.device; // verified by requireDeviceAuth
 
   const [log] = await prisma.$transaction([
     prisma.soilLog.create({
@@ -36,7 +33,7 @@ sensorRouter.post("/", async (req, res) => {
 
   res.status(201).json({
     id: log.id,
-    deviceId,
+    deviceId: device.deviceId,
     moisturePercent: log.moisturePercent,
     recordedAt: log.recordedAt,
   });

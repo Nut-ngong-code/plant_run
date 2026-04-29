@@ -157,6 +157,7 @@ export function Dashboard() {
                   totalPoints={data.user.totalPoints}
                   onAction={handleAction}
                   lastSyncedAt={d.latestMoisture?.recordedAt}
+                  userId={userId}
                 />
               ))}
             </div>

@@ -29,10 +29,11 @@ model User {
 }
 
 model Device {
-  id           Int            @id @default(autoincrement())
-  userId       Int            @map("user_id")
-  deviceId     String         @unique(map: "device_id") @map("device_id") @db.VarChar(100)
-  displayName  String?        @map("display_name") @db.VarChar(150)
+  id            Int            @id @default(autoincrement())
+  userId        Int            @map("user_id")
+  deviceId      String         @unique(map: "device_id") @map("device_id") @db.VarChar(100)
+  authTokenHash String?        @map("auth_token_hash") @db.VarChar(64)
+  displayName   String?        @map("display_name") @db.VarChar(150)
   isOnline     Boolean?       @default(false) @map("is_online")
   lastSeenAt   DateTime?      @map("last_seen_at") @db.DateTime(0)
   createdAt    DateTime?      @default(now()) @map("created_at") @db.Timestamp(0)

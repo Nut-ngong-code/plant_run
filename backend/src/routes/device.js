@@ -3,17 +3,15 @@ import { z } from "zod";
 
 import { prisma } from "../lib/prisma.js";
 import { HttpError } from "../middleware/error.js";
+import { requireDeviceAuth, generateToken, hashToken } from "../middleware/deviceAuth.js";
 
 export const deviceRouter = Router();
 
 // GET /api/device/:deviceId/command
 // ESP32 polls นี้เป็นระยะ เพื่อเช็คว่ามีคำสั่ง pending รออยู่ไหม
 // ถ้ามี -> เปลี่ยน status เป็น "executing" และส่งคำสั่งกลับไป
-deviceRouter.get("/:deviceId/command", async (req, res) => {
-  const { deviceId } = req.params;
-
-  const device = await prisma.device.findUnique({ where: { deviceId } });
-  if (!device) throw new HttpError(404, "Device not registered", { deviceId });
+deviceRouter.get("/:deviceId/command", requireDeviceAuth, async (req, res) => {
+  const device = req.device; // verified by requireDeviceAuth
 
   const pending = await prisma.actionLog.findFirst({
     where: { deviceId: device.id, status: "pending" },
@@ -44,7 +42,7 @@ const ackBody = z.object({
   status: z.enum(["success", "failed"]),
 });
 
-deviceRouter.post("/:deviceId/command/:commandId/ack", async (req, res) => {
+deviceRouter.post("/:deviceId/command/:commandId/ack", requireDeviceAuth, async (req, res) => {
   const commandId = Number(req.params.commandId);
   if (!Number.isInteger(commandId)) throw new HttpError(400, "Invalid command id");
   const { status } = ackBody.parse(req.body);
@@ -94,19 +92,70 @@ const registerBody = z.object({
   displayName: z.string().optional(),
 });
 
+// POST /api/device/:deviceId/rotate-token
+// ออก token ใหม่ (one-time) สำหรับอุปกรณ์ที่มีอยู่ — invalidate ของเก่าทันที
+// Auth: prototype ตรวจแค่ userId ใน body ตรงกับ device.userId
+//       (เวอร์ชันมี user-session จริง ค่อยย้ายไป middleware)
+const rotateBody = z.object({
+  userId: z.number().int().positive(),
+});
+
+deviceRouter.post("/:deviceId/rotate-token", async (req, res) => {
+  const { deviceId } = req.params;
+  const { userId } = rotateBody.parse(req.body);
+
+  const device = await prisma.device.findUnique({ where: { deviceId } });
+  if (!device) throw new HttpError(404, "Device not registered", { deviceId });
+  if (device.userId !== userId) {
+    throw new HttpError(403, "Device not owned by this user");
+  }
+
+  const token = generateToken();
+  const tokenHash = hashToken(token);
+  const updated = await prisma.device.update({
+    where: { id: device.id },
+    data: { authTokenHash: tokenHash },
+  });
+
+  res.json({
+    device: {
+      id: updated.id,
+      deviceId: updated.deviceId,
+      displayName: updated.displayName,
+    },
+    deviceToken: token, // ⚠️ แสดงรอบเดียว
+  });
+});
+
+// POST /api/device — ลงทะเบียน/ผูกอุปกรณ์ + ออก device token ใหม่ (one-time)
+// คืน plaintext token ใน response รอบนี้รอบเดียว — DB เก็บแค่ SHA-256 hash
 deviceRouter.post("/", async (req, res) => {
   const data = registerBody.parse(req.body);
+
+  const token = generateToken();
+  const tokenHash = hashToken(token);
+
   const device = await prisma.device.upsert({
     where: { deviceId: data.deviceId },
     create: {
       userId: data.userId,
       deviceId: data.deviceId,
       displayName: data.displayName,
+      authTokenHash: tokenHash,
     },
     update: {
       userId: data.userId,
       displayName: data.displayName ?? undefined,
+      authTokenHash: tokenHash, // rotate ทุกครั้งที่ register ซ้ำ
     },
   });
-  res.status(201).json(device);
+
+  res.status(201).json({
+    device: {
+      id: device.id,
+      deviceId: device.deviceId,
+      displayName: device.displayName,
+    },
+    deviceToken: token, // ⚠️ แสดงรอบเดียว — backend ไม่เก็บ plaintext
+  });
 });

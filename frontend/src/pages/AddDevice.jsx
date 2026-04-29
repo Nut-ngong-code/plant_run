@@ -13,7 +13,7 @@ export function AddDevice() {
   const [displayName, setDisplayName] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
-  const [success, setSuccess] = useState(false);
+  const [issuedToken, setIssuedToken] = useState(null); // one-time device token
 
   useEffect(() => {
     getDashboard(userId)
@@ -26,13 +26,13 @@ export function AddDevice() {
     setError(null);
     setSubmitting(true);
     try {
-      await registerDevice({
+      const resp = await registerDevice({
         userId,
         deviceId: deviceId.trim(),
         displayName: displayName.trim() || undefined,
       });
-      setSuccess(true);
-      setTimeout(() => navigate("/"), 800);
+      // Backend ส่งคืน { device, deviceToken } — token แสดงรอบเดียว
+      setIssuedToken(resp.deviceToken);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -57,64 +57,123 @@ export function AddDevice() {
           </p>
         </div>
 
-        <form onSubmit={onSubmit} className="surface rounded-3xl p-6 sm:p-7 space-y-5 mt-6">
-          <Field
-            label="DEVICE ID"
-            hint="เช่น POT-001 หรือ MAC address ของบอร์ด (ห้ามซ้ำกับผู้ใช้อื่น)"
-            required
-          >
-            <input
-              type="text"
-              value={deviceId}
-              onChange={(e) => setDeviceId(e.target.value)}
-              placeholder="POT-001"
-              autoFocus
-              className="data-input font-mono"
-            />
-          </Field>
+        {issuedToken ? (
+          <TokenIssued
+            deviceId={deviceId.trim()}
+            token={issuedToken}
+            onDone={() => navigate("/")}
+          />
+        ) : (
+          <>
+            <form onSubmit={onSubmit} className="surface rounded-3xl p-6 sm:p-7 space-y-5 mt-6">
+              <Field
+                label="DEVICE ID"
+                hint="เช่น POT-001 หรือ MAC address ของบอร์ด (ห้ามซ้ำกับผู้ใช้อื่น)"
+                required
+              >
+                <input
+                  type="text"
+                  value={deviceId}
+                  onChange={(e) => setDeviceId(e.target.value)}
+                  placeholder="POT-001"
+                  autoFocus
+                  className="data-input font-mono"
+                />
+              </Field>
 
-          <Field label="DISPLAY NAME" hint="ตั้งชื่อเล่นก็ได้ เช่น 'กระบองเพชรน้อย'">
-            <input
-              type="text"
-              value={displayName}
-              onChange={(e) => setDisplayName(e.target.value)}
-              placeholder="ต้นกระบองเพชร"
-              className="data-input"
-            />
-          </Field>
+              <Field label="DISPLAY NAME" hint="ตั้งชื่อเล่นก็ได้ เช่น 'กระบองเพชรน้อย'">
+                <input
+                  type="text"
+                  value={displayName}
+                  onChange={(e) => setDisplayName(e.target.value)}
+                  placeholder="ต้นกระบองเพชร"
+                  className="data-input"
+                />
+              </Field>
 
-          {error && (
-            <div className="text-sm text-rose-700 bg-rose-50/70 border border-rose-200 rounded-xl px-3.5 py-2.5">
-              {error}
+              {error && (
+                <div className="text-sm text-rose-700 bg-rose-50/70 border border-rose-200 rounded-xl px-3.5 py-2.5">
+                  {error}
+                </div>
+              )}
+
+              <div className="flex flex-col sm:flex-row gap-2 pt-1">
+                <button type="submit" disabled={!valid || submitting} className="btn-primary flex-1">
+                  {submitting ? "SAVING…" : "SAVE DEVICE"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => navigate("/")}
+                  className="btn-outline flex-1 sm:flex-initial sm:px-6"
+                >
+                  CANCEL
+                </button>
+              </div>
+            </form>
+
+            <div className="mt-6 text-xs text-forest-500 leading-relaxed">
+              <strong className="text-forest-700 font-mono uppercase tracking-wider">Note:</strong>{" "}
+              ลงทะเบียนซ้ำจะ <strong>หมุน token ใหม่</strong> — ของเก่าใช้ไม่ได้ทันที
+              (ต้อง re-flash firmware ด้วย token ใหม่)
             </div>
-          )}
-
-          {success && (
-            <div className="text-sm text-plant-700 bg-plant-100/70 border border-plant-300/60 rounded-xl px-3.5 py-2.5 font-mono">
-              ✓ DEVICE LINKED · returning to dashboard…
-            </div>
-          )}
-
-          <div className="flex flex-col sm:flex-row gap-2 pt-1">
-            <button type="submit" disabled={!valid || submitting} className="btn-primary flex-1">
-              {submitting ? "SAVING…" : "SAVE DEVICE"}
-            </button>
-            <button
-              type="button"
-              onClick={() => navigate("/")}
-              className="btn-outline flex-1 sm:flex-initial sm:px-6"
-            >
-              CANCEL
-            </button>
-          </div>
-        </form>
-
-        <div className="mt-6 text-xs text-forest-500 leading-relaxed">
-          <strong className="text-forest-700 font-mono uppercase tracking-wider">Note:</strong>{" "}
-          ถ้า Device ID นี้เคยถูกผูกไว้ก่อนแล้ว ระบบจะย้ายมาเป็นของคุณแทน (update โดย unique key)
-        </div>
+          </>
+        )}
       </main>
     </>
+  );
+}
+
+function TokenIssued({ deviceId, token, onDone }) {
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(token);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // ผู้ใช้อาจอยู่ใน context ที่ clipboard ใช้ไม่ได้ (http+ไม่ใช่ localhost)
+      // — ปล่อยให้คัดลอก manual จาก textarea
+    }
+  };
+
+  return (
+    <div className="surface-elev rounded-3xl p-6 sm:p-7 mt-6 space-y-5 animate-fade-up">
+      <div className="flex items-baseline gap-2">
+        <span className="chip surface-flat text-plant-700">
+          <span className="h-1.5 w-1.5 rounded-full bg-plant-500 animate-pulse" />
+          DEVICE LINKED
+        </span>
+        <span className="font-mono text-[11px] text-forest-500">{deviceId}</span>
+      </div>
+
+      <div>
+        <div className="label-eyebrow text-sun-700 mb-2">⚠ DEVICE TOKEN — SHOWN ONCE</div>
+        <p className="text-xs text-forest-600 mb-3 leading-relaxed">
+          คัดลอก token นี้ใส่ใน firmware ของ ESP32 (ค่า <code className="font-mono">DEVICE_TOKEN</code>) <strong>ก่อนปิดหน้านี้</strong> —
+          ระบบเก็บแค่ hash ดูค่า plaintext อีกไม่ได้ ถ้าทำหายต้องลงทะเบียนใหม่ (token เก่าจะถูก rotate)
+        </p>
+        <textarea
+          readOnly
+          value={token}
+          rows={2}
+          onFocus={(e) => e.target.select()}
+          className="data-input font-mono text-xs w-full break-all resize-none"
+        />
+        <button
+          type="button"
+          onClick={copy}
+          className={`btn-outline mt-3 w-full ${copied ? "text-plant-700 border-plant-400" : ""}`}
+        >
+          {copied ? "✓ COPIED TO CLIPBOARD" : "COPY TOKEN"}
+        </button>
+      </div>
+
+      <div className="pt-2 border-t border-white/70 flex flex-col sm:flex-row gap-2">
+        <button onClick={onDone} className="btn-primary flex-1">
+          I&apos;VE SAVED IT — GO TO DASHBOARD
+        </button>
+      </div>
+    </div>
   );
 }
 

@@ -14,7 +14,8 @@ CREATE TABLE USER (
 CREATE TABLE DEVICE (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL, -- FK
-    device_id VARCHAR(100) UNIQUE NOT NULL, -- UK (เช่น MAC Address ของ ESP32)
+    device_id VARCHAR(100) UNIQUE NOT NULL, -- UK (เช่น MAC Address ของ ESP32) — identification
+    auth_token_hash VARCHAR(64), -- SHA-256 hex ของ device token — authentication (plaintext token แสดงครั้งเดียวตอน register)
     display_name VARCHAR(150),
     is_online BOOLEAN DEFAULT FALSE,
     last_seen_at DATETIME,

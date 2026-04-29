@@ -1,12 +1,17 @@
 import { useState } from "react";
 import { moodFromStatus, PlantGraphic } from "./PlantGraphic.jsx";
 import { MoistureGauge } from "./MoistureGauge.jsx";
+import { rotateDeviceToken } from "../api/endpoints.js";
 
 const COST = { water: 15, fertilizer: 20 };
 
-export function PlantCard({ device, totalPoints, onAction, lastSyncedAt }) {
+export function PlantCard({ device, totalPoints, onAction, lastSyncedAt, userId }) {
   const [busyType, setBusyType] = useState(null);
   const [errorMsg, setErrorMsg] = useState(null);
+  // Rotate-token state machine: idle | confirm | rotating | issued
+  const [rotateState, setRotateState] = useState("idle");
+  const [issuedToken, setIssuedToken] = useState(null);
+  const [copied, setCopied] = useState(false);
 
   const moisture = device.latestMoisture?.moisturePercent ?? null;
   const mood = moodFromStatus({ moisturePercent: moisture, totalPoints });
@@ -21,6 +26,35 @@ export function PlantCard({ device, totalPoints, onAction, lastSyncedAt }) {
     } finally {
       setBusyType(null);
     }
+  };
+
+  const confirmRotate = async () => {
+    setRotateState("rotating");
+    setErrorMsg(null);
+    try {
+      const r = await rotateDeviceToken(userId, device.deviceId);
+      setIssuedToken(r.deviceToken);
+      setRotateState("issued");
+    } catch (e) {
+      setErrorMsg(e.message);
+      setRotateState("idle");
+    }
+  };
+
+  const copyToken = async () => {
+    try {
+      await navigator.clipboard.writeText(issuedToken);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // ปล่อย — ผู้ใช้คัดลอก manual จาก textarea ได้
+    }
+  };
+
+  const dismissRotate = () => {
+    setRotateState("idle");
+    setIssuedToken(null);
+    setCopied(false);
   };
 
   return (
@@ -47,23 +81,45 @@ export function PlantCard({ device, totalPoints, onAction, lastSyncedAt }) {
             {device.displayName ?? "MY POT"}
           </h3>
         </div>
-        <span
-          className={`chip border ${
-            device.isOnline
-              ? "bg-plant-100/70 text-plant-700 border-plant-300/50"
-              : "bg-white/40 text-forest-400 border-white/60"
-          }`}
-        >
+        <div className="flex items-center gap-1.5 shrink-0">
+          <button
+            type="button"
+            onClick={() => setRotateState("confirm")}
+            title="Rotate device token"
+            className="h-7 w-7 rounded-full flex items-center justify-center text-forest-500 hover:text-forest-800 hover:bg-white/60 transition"
+            aria-label="rotate token"
+          >
+            <KeyIcon />
+          </button>
           <span
-            className={`h-1.5 w-1.5 rounded-full ${
+            className={`chip border ${
               device.isOnline
-                ? "bg-plant-500 shadow-[0_0_8px_rgba(14,161,90,0.6)] animate-pulse"
-                : "bg-forest-300"
+                ? "bg-plant-100/70 text-plant-700 border-plant-300/50"
+                : "bg-white/40 text-forest-400 border-white/60"
             }`}
-          />
-          {device.isOnline ? "LIVE" : "OFFLINE"}
-        </span>
+          >
+            <span
+              className={`h-1.5 w-1.5 rounded-full ${
+                device.isOnline
+                  ? "bg-plant-500 shadow-[0_0_8px_rgba(14,161,90,0.6)] animate-pulse"
+                  : "bg-forest-300"
+              }`}
+            />
+            {device.isOnline ? "LIVE" : "OFFLINE"}
+          </span>
+        </div>
       </header>
+
+      {rotateState !== "idle" && (
+        <RotateOverlay
+          state={rotateState}
+          token={issuedToken}
+          copied={copied}
+          onConfirm={confirmRotate}
+          onCopy={copyToken}
+          onDismiss={dismissRotate}
+        />
+      )}
 
       {/* gauge wraps plant */}
       <div className="relative flex items-center justify-center pb-4 pt-1">
@@ -103,6 +159,63 @@ export function PlantCard({ device, totalPoints, onAction, lastSyncedAt }) {
         <div className="text-[10px] text-forest-400 text-right font-mono tracking-wider uppercase">
           SYNC {new Date(lastSyncedAt).toLocaleTimeString("th-TH")}
         </div>
+      )}
+    </div>
+  );
+}
+
+function KeyIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+         strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <circle cx="7.5" cy="15.5" r="3.5" />
+      <path d="M10 13l8-8M15 8l3 3M14 9l3 3" />
+    </svg>
+  );
+}
+
+function RotateOverlay({ state, token, copied, onConfirm, onCopy, onDismiss }) {
+  return (
+    <div className="absolute inset-0 z-10 rounded-3xl bg-white/85 backdrop-blur-md flex flex-col p-5 gap-4 animate-fade-up">
+      {state === "confirm" && (
+        <>
+          <div className="label-eyebrow text-sun-700">⚠ ROTATE DEVICE TOKEN</div>
+          <p className="text-sm text-forest-700 leading-relaxed">
+            ออก token ใหม่ — token เก่าใช้ไม่ได้ทันที
+            <br />
+            <span className="text-forest-500 text-xs">
+              คุณจะต้อง re-flash firmware ของ ESP32 ด้วย token ใหม่ก่อนถึงใช้งานต่อได้
+            </span>
+          </p>
+          <div className="mt-auto flex gap-2">
+            <button onClick={onConfirm} className="btn-primary flex-1">CONFIRM</button>
+            <button onClick={onDismiss} className="btn-outline flex-1">CANCEL</button>
+          </div>
+        </>
+      )}
+      {state === "rotating" && (
+        <div className="m-auto label-eyebrow text-plant-600 animate-pulse">ROTATING…</div>
+      )}
+      {state === "issued" && (
+        <>
+          <div className="label-eyebrow text-plant-700">✓ NEW TOKEN — SHOWN ONCE</div>
+          <textarea
+            readOnly
+            value={token ?? ""}
+            rows={3}
+            onFocus={(e) => e.target.select()}
+            className="data-input font-mono text-[11px] w-full break-all resize-none"
+          />
+          <button
+            onClick={onCopy}
+            className={`btn-outline w-full ${copied ? "text-plant-700 border-plant-400" : ""}`}
+          >
+            {copied ? "✓ COPIED" : "COPY TOKEN"}
+          </button>
+          <button onClick={onDismiss} className="btn-primary w-full mt-auto">
+            I&apos;VE SAVED IT
+          </button>
+        </>
       )}
     </div>
   );

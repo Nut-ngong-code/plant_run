@@ -12,6 +12,9 @@ export const sendAction = (payload) =>
 export const registerDevice = (payload) =>
   api.post(`/api/device`, payload).then((r) => r.data);
 
+export const rotateDeviceToken = (userId, deviceId) =>
+  api.post(`/api/device/${deviceId}/rotate-token`, { userId }).then((r) => r.data);
+
 export const syncStrava = (userId) =>
   api.post(`/api/auth/strava/sync/${userId}`, {}).then((r) => r.data);
 
