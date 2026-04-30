@@ -21,13 +21,17 @@ const int valveFertilizerPin = 33;
 
 // ===== 4. Moisture calibration (raw ADC -> percent) =====
 //   ปรับ 2 ค่านี้ให้ตรง sensor จริง: วัด raw ตอน "แห้งสนิท" และ "จุ่มน้ำ" แล้วใส่
-const int RAW_DRY = 3500;   // ค่า raw ตอนแห้ง  -> 0%
-const int RAW_WET = 1500;   // ค่า raw ตอนจุ่มน้ำ -> 100%
+const int RAW_DRY = 2500;   // ค่า raw ตอนแห้ง  -> 0%
+const int RAW_WET = 1400;   // ค่า raw ตอนจุ่มน้ำ -> 100%
 
 // ===== 5. Auto rules / intervals =====
-int                 threshold          = 2000;   // raw — ออโต้รดน้ำเมื่อ raw > threshold (แห้ง)
+// Hysteresis-based auto-water: ON เมื่อ very dry, OFF พอกลับมาแค่ "dry" — ไม่รดเต็มถึง moist
+// ช่วง 10-25% คงสถานะเดิมไว้ กัน flapping จาก sensor noise
+const int           AUTO_WATER_ON_PCT  = 10;     // % — เริ่มรดน้ำเมื่อต่ำกว่านี้ (very dry)
+const int           AUTO_WATER_OFF_PCT = 25;     // % — หยุดเมื่อสูงกว่านี้ (กลับสู่ dry zone)
+const unsigned long AUTO_WATER_MAX_MS  = 60000;  // safety cap — ปั๊ม auto เปิดต่อเนื่องเกิน 60 วิ = sensor น่าจะพัง
 const unsigned long FERT_DURATION_MS   = 5000;   // ปุ่มปุ๋ย local = 5 วิ
-const unsigned long SENSOR_POST_MS     = 30000;  // POST /api/sensor ทุก 30 วิ
+const unsigned long SENSOR_POST_MS     = 10000;  // POST /api/sensor ทุก 10 วิ
 const unsigned long COMMAND_POLL_MS    = 5000;   // poll /command ทุก 5 วิ
 
 // ===== 6. State =====
@@ -37,6 +41,12 @@ bool          isFertilizing = false;
 unsigned long fertStartTime = 0;
 
 bool          isManualWater = false;
+
+// Auto-water hysteresis state — true ถ้ากำลังรดน้ำอัตโนมัติอยู่
+bool          autoWaterActive    = false;
+unsigned long autoWaterStartedAt = 0;
+// Lockout: ถ้าครบ MAX_MS แล้วยังต่ำ ถือว่า sensor น่าจะพัง — ห้าม auto จนกว่า % จะกลับมาเกิน OFF threshold
+bool          autoWaterLocked    = false;
 
 // Cloud-driven action override
 bool          isCloudActive    = false;
@@ -187,7 +197,7 @@ void handleRoot() {
   // ส่วน 1: ความชื้น
   html += "<div class=\"card\"><h2>ความชื้นในดิน</h2>";
   html += "<h1 id=\"moistureValue\" style=\"color:#007bff;font-size:60px;margin:10px 0;\">--</h1>";
-  html += "<p style=\"color:#6c757d;font-size:14px;\">ระบบออโต้จะทำงานเมื่อค่าเกิน " + String(threshold) + "</p></div>";
+  html += "<p style=\"color:#6c757d;font-size:14px;\">ระบบออโต้: รดน้ำเมื่อ &lt; " + String(AUTO_WATER_ON_PCT) + "% · หยุดเมื่อ &gt; " + String(AUTO_WATER_OFF_PCT) + "%</p></div>";
 
   // ส่วน 2: Manual + Cloud status
   html += "<div class=\"card\"><h2>🎛️ ควบคุมด้วยมือ (Manual)</h2>";
@@ -273,8 +283,32 @@ void loop() {
   } else if (isManualWater) {
     openWaterValve();
   } else {
-    int raw = analogRead(sensorPin);
-    if (raw > threshold) openWaterValve();
+    // Auto-water with hysteresis + safety cap
+    // ON: < AUTO_WATER_ON_PCT, OFF: > AUTO_WATER_OFF_PCT
+    // Lock: เปิดต่อเนื่องเกิน AUTO_WATER_MAX_MS = sensor น่าจะพัง บังคับปิด + ห้าม re-trigger จนกว่า % จะ recover
+    int pct = readMoisturePercent();
+    if (autoWaterLocked) {
+      // ปลด lock เมื่อ sensor แสดงค่าที่ "ฟื้นแล้ว" จริงๆ
+      if (pct > AUTO_WATER_OFF_PCT) {
+        autoWaterLocked = false;
+        Serial.println("[auto] lockout cleared — sensor recovered");
+      }
+    } else if (!autoWaterActive && pct < AUTO_WATER_ON_PCT) {
+      autoWaterActive = true;
+      autoWaterStartedAt = now;
+      Serial.printf("[auto] start watering — pct=%d\n", pct);
+    } else if (autoWaterActive) {
+      if (pct > AUTO_WATER_OFF_PCT) {
+        autoWaterActive = false;
+        Serial.printf("[auto] stop watering — recovered to pct=%d\n", pct);
+      } else if (now - autoWaterStartedAt > AUTO_WATER_MAX_MS) {
+        autoWaterActive = false;
+        autoWaterLocked = true;
+        Serial.printf("[auto] WARNING: max duration %lums hit at pct=%d — sensor may be faulty, locking out\n",
+                      AUTO_WATER_MAX_MS, pct);
+      }
+    }
+    if (autoWaterActive) openWaterValve();
     else                 closeAll();
   }
 
