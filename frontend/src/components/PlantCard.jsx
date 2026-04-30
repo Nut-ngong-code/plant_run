@@ -156,7 +156,7 @@ export function PlantCard({ device, totalPoints, onAction, onDelete, lastSyncedA
           label="WATER"
           emoji="💧"
           cost={COST.water}
-          disabled={totalPoints < COST.water}
+          disabled={totalPoints < COST.water || !device.isOnline}
           busy={busyType === "water"}
           onClick={() => handle("water")}
           variant="water"
@@ -165,12 +165,18 @@ export function PlantCard({ device, totalPoints, onAction, onDelete, lastSyncedA
           label="FERTILIZE"
           emoji="🌿"
           cost={COST.fertilizer}
-          disabled={totalPoints < COST.fertilizer}
+          disabled={totalPoints < COST.fertilizer || !device.isOnline}
           busy={busyType === "fertilizer"}
           onClick={() => handle("fertilizer")}
           variant="fertilizer"
         />
       </div>
+
+      {!device.isOnline && (
+        <div className="text-[11px] text-rose-700 bg-rose-50/80 border border-rose-200 rounded-lg px-3 py-2 text-center font-mono tracking-wide">
+          DEVICE OFFLINE — RECONNECT ESP32 TO SEND COMMANDS
+        </div>
+      )}
 
       {errorMsg && (
         <div className="text-xs text-rose-700 bg-rose-50/80 border border-rose-200 rounded-lg px-3 py-2">

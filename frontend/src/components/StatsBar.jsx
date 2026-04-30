@@ -4,8 +4,22 @@ export function StatsBar({ user, weekly }) {
   const weeklyPts = weekly?.pointsEarned ?? 0;
   const runCount = weekly?.runCount ?? 0;
 
+  // ต่ำกว่า cost ของรดน้ำ (15) = สั่งงานไม่ได้แล้ว — เตือนให้ไปวิ่ง
+  const MIN_TO_WATER = 15;
+  const lowPoints = totalPoints < MIN_TO_WATER;
+  const ptsNeeded = MIN_TO_WATER - totalPoints;
+
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
+    <div className="space-y-3 sm:space-y-4">
+      {lowPoints && (
+        <div className="flex animate-fade-up">
+          <span className="chip border bg-sun-100/70 text-sun-800 border-sun-300/60 backdrop-blur-sm">
+            <span className="h-1.5 w-1.5 rounded-full bg-sun-500 shadow-[0_0_6px_rgba(252,138,2,0.6)] animate-pulse" />
+            <span>⚡ GO RUN — NEED {ptsNeeded} MORE PTS TO WATER ({(ptsNeeded / 10).toFixed(1)} KM)</span>
+          </span>
+        </div>
+      )}
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
       <Stat
         label="TOTAL POINTS"
         value={totalPoints}
@@ -31,6 +45,7 @@ export function StatsBar({ user, weekly }) {
         isText
         className="col-span-2 sm:col-span-1"
       />
+      </div>
     </div>
   );
 }

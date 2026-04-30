@@ -196,9 +196,11 @@ export function PlantGraphic({ mood = "happy", size = 160, animated = true }) {
   );
 }
 
-export function moodFromStatus({ moisturePercent, totalPoints }) {
+// Mood สะท้อนสุขภาพต้นไม้ตาม moisture เท่านั้น — แยกจาก totalPoints
+// (low points เป็นเรื่องผู้ใช้ ไม่ใช่สถานะต้นไม้ — ใส่ nudge แยก UI ถ้าต้องการ)
+export function moodFromStatus({ moisturePercent }) {
   const m = moisturePercent ?? 50;
-  if (m < 25) return "sad";
-  if (m < 50 || (totalPoints ?? 0) < 15) return "neutral";
+  if (m < 20) return "sad";
+  if (m < 45) return "neutral";
   return "happy";
 }
