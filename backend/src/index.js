@@ -9,6 +9,7 @@ import { deviceRouter } from "./routes/device.js";
 import { userRouter } from "./routes/user.js";
 import { actionRouter } from "./routes/action.js";
 import { stravaRouter } from "./routes/strava.js";
+import { cleanupStaleCommands } from "./jobs/cleanupStale.js";
 
 const app = express();
 
@@ -34,7 +35,14 @@ app.use(errorHandler);
 
 app.listen(config.port, () => {
   console.log(`🌱 Backend ready at http://localhost:${config.port}`);
+  // Sweep stale executing commands ทันทีตอน start (กวาดของค้างจาก process เก่า)
+  cleanupStaleCommands().catch((e) => console.error("[cleanup] startup error:", e));
 });
+
+// Sweep ทุก 60 วิ — refund แต้มของ command ที่ค้าง (ESP32 ตายระหว่าง execute)
+setInterval(() => {
+  cleanupStaleCommands().catch((e) => console.error("[cleanup] interval error:", e));
+}, 60_000);
 
 function renderIndex() {
   const groups = [

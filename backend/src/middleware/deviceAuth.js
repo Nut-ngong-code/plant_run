@@ -38,6 +38,13 @@ export async function requireDeviceAuth(req, _res, next) {
       throw new HttpError(401, "Invalid token");
     }
 
+    // Heartbeat: ทุก authenticated request นับเป็นสัญญาณว่าอุปกรณ์ยัง alive
+    // dashboard คำนวณ isOnline จาก lastSeenAt + threshold ตอนอ่าน
+    await prisma.device.update({
+      where: { id: device.id },
+      data: { lastSeenAt: new Date() },
+    });
+
     req.device = device;
     next();
   } catch (err) {

@@ -12,24 +12,19 @@ const postBody = z.object({
 });
 
 // POST /api/sensor
-// ESP32 ยิงค่าความชื้นในดินมาเก็บใน SOIL_LOG + อัปเดตสถานะออนไลน์ของ Device
+// ESP32 ยิงค่าความชื้นในดินมาเก็บใน SOIL_LOG
 // ต้องแนบ Bearer token ที่ตรงกับ device.authTokenHash (กัน spoofing)
+// lastSeenAt heartbeat อยู่ใน requireDeviceAuth middleware แล้ว — ไม่ต้องอัปเดตซ้ำ
 sensorRouter.post("/", requireDeviceAuth, async (req, res) => {
   const { moisturePercent } = postBody.parse(req.body);
   const device = req.device; // verified by requireDeviceAuth
 
-  const [log] = await prisma.$transaction([
-    prisma.soilLog.create({
-      data: {
-        deviceId: device.id,
-        moisturePercent,
-      },
-    }),
-    prisma.device.update({
-      where: { id: device.id },
-      data: { isOnline: true, lastSeenAt: new Date() },
-    }),
-  ]);
+  const log = await prisma.soilLog.create({
+    data: {
+      deviceId: device.id,
+      moisturePercent,
+    },
+  });
 
   res.status(201).json({
     id: log.id,

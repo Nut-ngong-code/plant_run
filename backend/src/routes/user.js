@@ -29,6 +29,13 @@ userRouter.get("/:id/dashboard", async (req, res) => {
     orderBy: { id: "asc" },
   });
 
+  // คำนวณ isOnline จาก lastSeenAt — ถ้า heartbeat (sensor/poll/ack) เกิน threshold
+  // ถือว่า device หลุด ไม่พึ่งคอลัมน์ isOnline ใน DB ที่ค้างเป็น true ตลอด
+  const ONLINE_THRESHOLD_MS = 60_000;
+  const nowMs = Date.now();
+  const isDeviceOnline = (lastSeenAt) =>
+    lastSeenAt ? nowMs - new Date(lastSeenAt).getTime() < ONLINE_THRESHOLD_MS : false;
+
   // สัปดาห์ปัจจุบัน เริ่มวันจันทร์ 00:00 local
   const now = new Date();
   const dayOfWeek = (now.getDay() + 6) % 7; // Monday = 0
@@ -60,7 +67,7 @@ userRouter.get("/:id/dashboard", async (req, res) => {
       id: d.id,
       deviceId: d.deviceId,
       displayName: d.displayName,
-      isOnline: d.isOnline,
+      isOnline: isDeviceOnline(d.lastSeenAt),
       lastSeenAt: d.lastSeenAt,
       latestMoisture: d.soilLogs[0] ?? null,
     })),
