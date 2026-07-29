@@ -25,7 +25,14 @@ function safeReturnTo(raw) {
   try {
     const u = new URL(raw);
     if (u.protocol !== "http:" && u.protocol !== "https:") return null;
-    if (u.hostname !== "localhost" && u.hostname !== "127.0.0.1") return null;
+    // อนุญาตเฉพาะปลายทางที่เป็นของเราเอง — กัน open redirect
+    // localhost = ตอน dev · *.ts.net = Tailscale Funnel ตอน deploy บน Raspberry Pi
+    // เช็ค ".ts.net" แบบมีจุดนำหน้า เพื่อไม่ให้โดเมนหลอกอย่าง "evil-ts.net" ผ่าน
+    const allowed =
+      u.hostname === "localhost" ||
+      u.hostname === "127.0.0.1" ||
+      u.hostname.endsWith(".ts.net");
+    if (!allowed) return null;
     return u.origin;
   } catch {
     return null;

@@ -1,3 +1,7 @@
+import path from "node:path";
+import fs from "node:fs";
+import { fileURLToPath } from "node:url";
+
 import express from "express";
 import cors from "cors";
 
@@ -11,6 +15,12 @@ import { actionRouter } from "./routes/action.js";
 import { stravaRouter } from "./routes/strava.js";
 import { cleanupStaleCommands } from "./jobs/cleanupStale.js";
 
+// หน้าเว็บที่ build แล้ว — โหมด production (Raspberry Pi / Tailscale Funnel) เสิร์ฟจาก Express
+// ตัวเดียวกับ API เพราะ Funnel เปิดให้ได้พอร์ตเดียว ตอน dev ไม่มีโฟลเดอร์นี้ก็ข้ามไป (ใช้ Vite proxy เหมือนเดิม)
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const distDir = path.resolve(__dirname, "../../frontend/dist");
+const hasDist = fs.existsSync(path.join(distDir, "index.html"));
+
 const app = express();
 
 app.use(cors());
@@ -20,7 +30,8 @@ app.get("/health", (_req, res) => {
   res.json({ ok: true, uptime: process.uptime() });
 });
 
-app.get("/", (_req, res) => {
+// รายการ endpoint — อยู่ที่ / ตอน dev, ย้ายไป /_api ตอนมีหน้าเว็บ (/ ถูกใช้เสิร์ฟ SPA)
+app.get(hasDist ? "/_api" : "/", (_req, res) => {
   res.type("html").send(renderIndex());
 });
 
@@ -30,11 +41,26 @@ app.use("/api/user", userRouter);
 app.use("/api/action", actionRouter);
 app.use("/api/auth/strava", stravaRouter);
 
+if (hasDist) {
+  // ไฟล์ asset มี hash ในชื่ออยู่แล้ว → cache ยาวได้ ส่วน index.html ต้องสดเสมอ (จัดการด้านล่าง)
+  app.use(express.static(distDir, { index: false, maxAge: "1y" }));
+
+  // SPA fallback — React Router จัดการ path เอง (/history, /add-device, /auth/callback)
+  // ปล่อย /api/* กับ /health ผ่านไปให้ notFound ตอบ JSON ตามเดิม ไม่งั้นจะได้ HTML แทน 404
+  app.use((req, res, next) => {
+    if (req.method !== "GET" && req.method !== "HEAD") return next();
+    if (req.path.startsWith("/api/") || req.path === "/health") return next();
+    res.set("Cache-Control", "no-cache");
+    res.sendFile(path.join(distDir, "index.html"));
+  });
+}
+
 app.use(notFound);
 app.use(errorHandler);
 
 app.listen(config.port, () => {
   console.log(`🌱 Backend ready at http://localhost:${config.port}`);
+  console.log(hasDist ? `   เสิร์ฟหน้าเว็บจาก ${distDir} (API index อยู่ที่ /_api)` : "   ไม่พบ frontend/dist — โหมด dev (ใช้ Vite :5173)");
   // Sweep stale executing commands ทันทีตอน start (กวาดของค้างจาก process เก่า)
   cleanupStaleCommands().catch((e) => console.error("[cleanup] startup error:", e));
 });
