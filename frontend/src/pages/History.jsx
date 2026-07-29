@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  Area,
+  AreaChart,
   Bar,
   BarChart,
   CartesianGrid,
@@ -17,6 +19,7 @@ import { getDashboard, getHistory, getSoilHistory } from "../api/endpoints.js";
 import { getUserId } from "../lib/session.js";
 
 const CHART_HEIGHT = 240;
+const SOIL_BUCKET_MS = 30 * 60 * 1000; // กราฟ SOIL MOISTURE: ยุบข้อมูลดิบ (มาทุก ~5 นาที) เป็นจุดละ 30 นาที
 
 export function History() {
   const userId = getUserId();
@@ -51,7 +54,8 @@ export function History() {
   useEffect(() => {
     if (!selectedDevice) return;
     let cancelled = false;
-    getSoilHistory(selectedDevice, 200).then((logs) => {
+    getSoilHistory(selectedDevice, 288).then((logs) => {
+      // 288 แถว × ~5 นาที ≈ 24 ชม.ย้อนหลัง
       if (!cancelled) setSoilLogs(logs);
     });
     return () => {
@@ -61,15 +65,7 @@ export function History() {
 
   const runByDay = useMemo(() => aggregateRunsByDay(runs, 14), [runs]);
   const actionByDay = useMemo(() => aggregateActionsByDay(actions, 14), [actions]);
-  const soilSeries = useMemo(
-    () =>
-      soilLogs.map((s) => ({
-        time: new Date(s.recordedAt).getTime(),
-        label: formatClock(s.recordedAt),
-        moisture: s.moisturePercent,
-      })),
-    [soilLogs],
-  );
+  const soilSeries = useMemo(() => downsampleSoil(soilLogs, SOIL_BUCKET_MS), [soilLogs]);
 
   const totalKm = runs.reduce((sum, r) => sum + (r.distanceKm ?? 0), 0);
   const totalRuns = runs.length;
@@ -176,26 +172,44 @@ export function History() {
                 <Empty text="ยังไม่มีข้อมูลความชื้นจากกระถางนี้" />
               ) : (
                 <ResponsiveContainer width="100%" height={CHART_HEIGHT}>
-                  <LineChart data={soilSeries}>
+                  <AreaChart data={soilSeries} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
                     <defs>
-                      <linearGradient id="moistureG" x1="0" y1="0" x2="1" y2="0">
+                      <linearGradient id="moistureStroke" x1="0" y1="0" x2="1" y2="0">
                         <stop offset="0%" stopColor="#5FD491" />
                         <stop offset="100%" stopColor="#0EA5E9" />
                       </linearGradient>
+                      <linearGradient id="moistureFill" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#5FD491" stopOpacity={0.35} />
+                        <stop offset="100%" stopColor="#0EA5E9" stopOpacity={0.04} />
+                      </linearGradient>
                     </defs>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="label" />
-                    <YAxis domain={[0, 100]} unit="%" />
+                    <XAxis
+                      dataKey="label"
+                      tick={{ fontSize: 10, fill: "#94a3b8" }}
+                      axisLine={false}
+                      tickLine={false}
+                      minTickGap={48}
+                    />
+                    <YAxis
+                      domain={[0, 100]}
+                      unit="%"
+                      width={44}
+                      tick={{ fontSize: 10, fill: "#94a3b8" }}
+                      axisLine={false}
+                      tickLine={false}
+                    />
                     <Tooltip formatter={(v) => `${v}%`} />
-                    <Line
+                    <Area
                       type="monotone"
                       dataKey="moisture"
-                      stroke="url(#moistureG)"
+                      stroke="url(#moistureStroke)"
                       strokeWidth={2.5}
+                      fill="url(#moistureFill)"
                       dot={false}
+                      activeDot={{ r: 4, fill: "#0EA5E9" }}
                       name="Moisture"
                     />
-                  </LineChart>
+                  </AreaChart>
                 </ResponsiveContainer>
               )}
             </ChartCard>
@@ -335,6 +349,28 @@ function StatusPill({ status }) {
       {status}
     </span>
   );
+}
+
+// ยุบ soil log ดิบ (มาทุก ~5 นาที) เป็นจุดละ bucketMs (30 นาที) — เก็บค่าต่ำสุดในแต่ละช่วง
+// เก็บค่าต่ำสุดเพื่อไม่ให้กราฟซ่อนช่วงที่ดินแห้ง (dry dip) · ไม่กระทบข้อมูลใน DB
+function downsampleSoil(logs, bucketMs) {
+  const buckets = new Map();
+  for (const s of logs) {
+    const t = new Date(s.recordedAt).getTime();
+    if (Number.isNaN(t)) continue; // ข้ามแถวที่ timestamp เสีย กัน bucket key เป็น NaN
+    const key = Math.floor(t / bucketMs) * bucketMs;
+    const b = buckets.get(key);
+    if (!b || s.moisturePercent < b.moisture) {
+      buckets.set(key, { time: key, moisture: s.moisturePercent });
+    }
+  }
+  return [...buckets.values()]
+    .sort((a, b) => a.time - b.time)
+    .map((b) => ({
+      time: b.time,
+      label: formatClock(b.time),
+      moisture: b.moisture,
+    }));
 }
 
 function aggregateRunsByDay(runs, days) {

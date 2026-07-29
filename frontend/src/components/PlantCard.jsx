@@ -223,7 +223,7 @@ function CardOverlay({ mode, token, copied, onRotateConfirm, onDeleteConfirm, on
             ออก token ใหม่ — token เก่าใช้ไม่ได้ทันที
             <br />
             <span className="text-forest-500 text-xs">
-              คุณจะต้อง re-flash firmware ของ ESP32 ด้วย token ใหม่ก่อนถึงใช้งานต่อได้
+              นำ token ใหม่ไปใส่ในโหมดตั้งค่าของกระถาง (ปุ่ม “ตั้งค่าใหม่” บนหน้าเว็บของบอร์ด หรือกด BOOT ค้าง 3 วิ) — ไม่ต้อง flash ใหม่
             </span>
           </p>
           <div className="mt-auto flex gap-2">

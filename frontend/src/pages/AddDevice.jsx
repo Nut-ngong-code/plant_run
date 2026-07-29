@@ -52,9 +52,6 @@ export function AddDevice() {
           <h1 className="mt-3 font-display text-3xl font-bold tracking-tight text-forest-900">
             LINK <span className="grad-text">ESP32</span>
           </h1>
-          <p className="text-sm text-forest-500 mt-2">
-            ดู Device ID ที่ติดบนตัวบอร์ด ESP32 แล้วกรอกลงด้านล่าง
-          </p>
         </div>
 
         {issuedToken ? (
@@ -68,7 +65,7 @@ export function AddDevice() {
             <form onSubmit={onSubmit} className="surface rounded-3xl p-6 sm:p-7 space-y-5 mt-6">
               <Field
                 label="DEVICE ID"
-                hint="เช่น POT-001 หรือ MAC address ของบอร์ด (ห้ามซ้ำกับผู้ใช้อื่น)"
+                hint="เช่น POT-001"
                 required
               >
                 <input
@@ -114,7 +111,7 @@ export function AddDevice() {
             <div className="mt-6 text-xs text-forest-500 leading-relaxed">
               <strong className="text-forest-700 font-mono uppercase tracking-wider">Note:</strong>{" "}
               ลงทะเบียนซ้ำจะ <strong>หมุน token ใหม่</strong> — ของเก่าใช้ไม่ได้ทันที
-              (ต้อง re-flash firmware ด้วย token ใหม่)
+              (นำ token ใหม่ไปใส่ในโหมดตั้งค่าของกระถาง ไม่ต้อง flash ใหม่)
             </div>
           </>
         )}
@@ -149,8 +146,7 @@ function TokenIssued({ deviceId, token, onDone }) {
       <div>
         <div className="label-eyebrow text-sun-700 mb-2">⚠ DEVICE TOKEN — SHOWN ONCE</div>
         <p className="text-xs text-forest-600 mb-3 leading-relaxed">
-          คัดลอก token นี้ใส่ใน firmware ของ ESP32 (ค่า <code className="font-mono">DEVICE_TOKEN</code>) <strong>ก่อนปิดหน้านี้</strong> —
-          ระบบเก็บแค่ hash ดูค่า plaintext อีกไม่ได้ ถ้าทำหายต้องลงทะเบียนใหม่ (token เก่าจะถูก rotate)
+          ระบบเก็บแค่ hash — ดูค่านี้อีกไม่ได้ ถ้าทำหายให้กด 🔑 บนการ์ดกระถางเพื่อออก token ใหม่
         </p>
         <textarea
           readOnly
@@ -166,6 +162,16 @@ function TokenIssued({ deviceId, token, onDone }) {
         >
           {copied ? "✓ COPIED TO CLIPBOARD" : "COPY TOKEN"}
         </button>
+      </div>
+
+      <div className="rounded-2xl bg-plant-50/60 border border-plant-200/70 p-4">
+        <div className="label-eyebrow text-plant-700 mb-2">📲 ติดตั้งลงกระถาง (ไม่ต้องใช้คอมพิวเตอร์/Arduino)</div>
+        <ol className="text-xs text-forest-700 leading-relaxed space-y-1.5 list-decimal pl-4">
+          <li>เสียบปลั๊กกระถาง — ครั้งแรกบอร์ดจะปล่อย Wi-Fi ชื่อ <code className="font-mono">PlantPot-Setup</code></li>
+          <li>ใช้มือถือต่อ Wi-Fi นั้น → หน้าตั้งค่าจะเด้งขึ้นเอง (ถ้าไม่เด้ง เปิดเบราว์เซอร์ไปที่ <code className="font-mono">192.168.4.1</code>)</li>
+          <li>เลือก Wi-Fi บ้าน + ใส่รหัส แล้ว<strong>วาง Token ด้านบน</strong>ลงช่อง Device Token</li>
+          <li>กด “บันทึก” — กระถางจะเชื่อมต่อและพร้อมใช้งานทันที</li>
+        </ol>
       </div>
 
       <div className="pt-2 border-t border-white/70 flex flex-col sm:flex-row gap-2">
