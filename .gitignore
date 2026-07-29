@@ -11,6 +11,8 @@ build/
 .env
 .env.*
 !.env.example
+# เทมเพลตที่ไม่มี secret เช่น .env.pi.example — commit ได้
+!.env.*.example
 
 # Generated code (Prisma client)
 generated/prisma/

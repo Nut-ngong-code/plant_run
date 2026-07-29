@@ -1,0 +1,38 @@
+# systemd unit — ให้ backend ขึ้นเองตอน Pi บูต ไม่ต้อง ssh เข้าไปสั่ง
+#
+# ติดตั้ง (รันบน Pi ครั้งเดียว):
+#   sudo cp ~/final-project/code/scripts/plant-backend.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now plant-backend
+#
+# ดูสถานะ / log:
+#   systemctl status plant-backend
+#   journalctl -u plant-backend -f
+#
+# ⚠️ ถ้า clone โปรเจกต์ไว้ path อื่น หรือ user ไม่ใช่ `pi` ต้องแก้ User= กับ WorkingDirectory= ให้ตรง
+
+[Unit]
+Description=Plant Watering backend (Express + Prisma)
+# รอ network ก่อน ไม่งั้น Prisma ต่อ MySQL ไม่ติดตอนบูต
+After=network-online.target docker.service
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/final-project/code/backend
+ExecStart=/usr/bin/node src/index.js
+Environment=NODE_ENV=production
+
+# MySQL ใน Docker ใช้เวลาบูตนานบน Pi 3 + SD card ถ้า backend ขึ้นก่อนจะตายแล้ว restart วนจนกว่า DB พร้อม
+Restart=always
+RestartSec=10
+
+# ให้ log ไปที่ journalctl
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=plant-backend
+
+[Install]
+WantedBy=multi-user.target

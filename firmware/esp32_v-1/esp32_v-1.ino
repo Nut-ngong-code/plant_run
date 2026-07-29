@@ -1,8 +1,10 @@
 #include <WiFi.h>
 #include <WebServer.h>
 #include <HTTPClient.h>
+#include <WiFiClientSecure.h>  // คุยกับ backend ผ่าน HTTPS (Tailscale Funnel เปิดแต่ https)
 #include <Preferences.h>   // เก็บค่าตั้งค่า (Wi-Fi/Token) ลง NVS ถาวร
 #include <DNSServer.h>     // captive portal — ดึงหน้าตั้งค่าให้เด้งเอง
+#include <ESPmDNS.h>       // เข้าหน้าตั้งค่าที่ http://plantpot.local โดยไม่ต้องรู้ IP ของบอร์ด
 
 // ============================================================================
 //  วิ่งเพื่อชีวิตของต้นไม้ในกระถาง — ESP32 firmware
@@ -13,7 +15,9 @@
 // ===== 1. Config (โหลดจาก NVS ตอน boot — ตั้งผ่าน Config Portal) =====
 Preferences prefs;
 String cfgSsid, cfgPass, cfgDeviceId, cfgToken, cfgApiBase;
-const char* DEFAULT_API_BASE = "http://192.168.1.4:3000"; // ค่าเริ่มต้น (แก้ในฟอร์มได้)
+// ค่าเริ่มต้นตอนยังไม่เคยตั้งค่า — แก้ได้ในฟอร์มตั้งค่า (AP) และที่หน้าเว็บ local (/setapi)
+// รองรับทั้ง http://<ip>:3000 (backend ในวง LAN) และ https://xxx.ts.net (Tailscale Funnel — ใช้ได้ทุกที่)
+const char* DEFAULT_API_BASE = "http://192.168.1.134:3000";
 
 // ===== 2. Config portal (AP mode) =====
 const char* AP_SSID    = "PlantPot-Setup";  // ชื่อ Wi-Fi ที่บอร์ดปล่อยตอนตั้งค่า
@@ -44,6 +48,7 @@ const unsigned long WIFI_RETRY_MS      = 30000;  // ลอง reconnect Wi-Fi �
 
 // ===== 6. State =====
 WebServer server(80);
+bool          mdnsUp = false;   // เริ่ม mDNS responder (plantpot.local) แล้วหรือยัง
 
 bool          isFertilizing = false;
 unsigned long fertStartTime = 0;
@@ -119,6 +124,37 @@ void closeAll() {
 }
 
 // ===== 9. Cloud client =====
+// รองรับทั้ง http:// (backend ในวง LAN) และ https:// (Tailscale Funnel / cloud)
+// เลือกจาก scheme ของ cfgApiBase อัตโนมัติ — ไม่ต้องตั้งอะไรเพิ่มในฟอร์ม
+WiFiClientSecure secureClient;   // global เพื่อให้ TLS session อยู่ข้าม request (เร็วขึ้น)
+WiFiClient       plainClient;
+bool             secureReady = false;
+
+bool usingHttps() { return cfgApiBase.startsWith("https://"); }
+
+// เตรียม HTTPClient ให้พร้อมยิง — คืน false ถ้าเปิด connection ไม่ได้
+bool beginRequest(HTTPClient& http, const String& url) {
+  bool ok;
+  if (usingHttps()) {
+    if (!secureReady) {
+      // ไม่ verify certificate — ESP32 ไม่มีนาฬิกาจริงตอนบูตและ root CA กินแฟลช
+      // ข้อมูลยังถูกเข้ารหัสระหว่างทาง (token ไม่โผล่บนเน็ต) แค่ไม่กัน MITM แบบเต็มรูปแบบ
+      secureClient.setInsecure();
+      secureReady = true;
+    }
+    ok = http.begin(secureClient, url);
+    // TLS handshake ใช้เวลามากกว่า plain HTTP หลายเท่า ต้องเผื่อ timeout ไม่งั้น fail ทุกครั้ง
+    http.setConnectTimeout(8000);
+    http.setTimeout(8000);
+  } else {
+    ok = http.begin(plainClient, url);
+    http.setConnectTimeout(3000);   // กัน block loop เมื่อ backend up-but-unresponsive
+    http.setTimeout(3000);
+  }
+  http.setReuse(true);              // keep-alive — ไม่ต้อง handshake ใหม่ทุก 5 วิ
+  return ok;
+}
+
 void addAuthHeaders(HTTPClient& http) {
   http.addHeader("Content-Type", "application/json");
   http.addHeader("Authorization", String("Bearer ") + cfgToken);
@@ -128,9 +164,7 @@ void postSensor() {
   if (WiFi.status() != WL_CONNECTED) return;
   HTTPClient http;
   String url = cfgApiBase + "/api/sensor";
-  http.begin(url);
-  http.setConnectTimeout(3000);   // กัน block loop เมื่อ backend up-but-unresponsive
-  http.setTimeout(3000);
+  if (!beginRequest(http, url)) { Serial.println("[sensor] begin failed"); return; }
   addAuthHeaders(http);
   int pct = readMoisturePercent();
   String body = String("{\"deviceId\":\"") + cfgDeviceId +
@@ -144,9 +178,7 @@ void ackCommand(long id, const char* status) {
   if (WiFi.status() != WL_CONNECTED) return;
   HTTPClient http;
   String url = cfgApiBase + "/api/device/" + cfgDeviceId + "/command/" + String(id) + "/ack";
-  http.begin(url);
-  http.setConnectTimeout(3000);
-  http.setTimeout(3000);
+  if (!beginRequest(http, url)) { Serial.println("[ack] begin failed"); return; }
   addAuthHeaders(http);
   String body = String("{\"status\":\"") + status + "\"}";
   int code = http.POST(body);
@@ -178,9 +210,7 @@ void pollCommand() {
 
   HTTPClient http;
   String url = cfgApiBase + "/api/device/" + cfgDeviceId + "/command";
-  http.begin(url);
-  http.setConnectTimeout(3000);
-  http.setTimeout(3000);
+  if (!beginRequest(http, url)) { Serial.println("[cmd] begin failed"); return; }
   addAuthHeaders(http);
   int code = http.GET();
   if (code != 200) {
@@ -255,7 +285,7 @@ void handleConfigRoot() {
     "<label>รหัส Wi-Fi</label><input name=\"pass\" type=\"password\" placeholder=\"รหัสผ่าน Wi-Fi\">"
     "<label>Device ID</label><input name=\"devid\" placeholder=\"เช่น POT-001\" value=\"" + htmlEscape(cfgDeviceId) + "\">"
     "<label>Device Token</label><input name=\"token\" placeholder=\"" + tokPh + "\">"
-    "<label>Server URL <span class=\"hint\">(ปกติไม่ต้องแก้)</span></label>"
+    "<label>Server URL <span class=\"hint\">(IP เครื่องที่รันเซิร์ฟเวอร์ — เว้นว่าง = ใช้ค่าเดิม)</span></label>"
     "<input name=\"api\" value=\"" + htmlEscape(cfgApiBase.length() ? cfgApiBase : String(DEFAULT_API_BASE)) + "\">"
     "<button type=\"submit\">บันทึก แล้วเชื่อมต่อ</button></form></div>"
     "<script>fetch('/scan').then(r=>r.json()).then(list=>{var s=document.getElementById('ssidsel');"
@@ -290,6 +320,7 @@ void handleSave() {
   // เว้นว่าง = ใช้ค่าเดิมใน NVS (แก้ Wi-Fi อย่างเดียวได้โดยไม่ต้องมี Token/Device ID ซ้ำ) — #2
   if (token.length() == 0) token = cfgToken;
   if (devid.length() == 0) devid = cfgDeviceId;
+  if (api.length()   == 0) api   = cfgApiBase;
 
   if (ssid.length() == 0) {
     server.send(400, "text/html; charset=utf-8",
@@ -362,7 +393,13 @@ void handleRoot() {
   html += "<button class=\"btn\" onclick=\"giveFertilizer()\">วิ่งครบ 5KM (สั่งจ่ายปุ๋ย 5 วิ)</button>";
   html += "<p id=\"statusText\" style=\"color:#dc3545;font-weight:bold;margin-top:15px;\"></p></div>";
 
-  html += "<div class=\"card\"><h2>⚙️ ตั้งค่า</h2><p style=\"color:#6c757d;font-size:13px;\">เปลี่ยน Wi-Fi หรือใส่ Token ใหม่</p>";
+  html += "<div class=\"card\"><h2>⚙️ ตั้งค่า</h2>";
+  html += "<p style=\"color:#6c757d;font-size:13px;margin-bottom:6px;\">Server URL — แก้เมื่อ IP เครื่อง backend เปลี่ยน (เช่น ย้าย Wi-Fi) · ไม่ล้าง Token/Wi-Fi</p>";
+  html += "<form method=\"POST\" action=\"/setapi\" style=\"margin-bottom:6px;\">";
+  html += "<input name=\"api\" value=\"" + htmlEscape(cfgApiBase) + "\" style=\"width:100%;padding:10px;border:1px solid #cdd;border-radius:7px;font-size:14px;box-sizing:border-box;\">";
+  html += "<button type=\"submit\" class=\"btn btn-primary\" style=\"margin-top:8px;\">บันทึก Server URL</button></form>";
+  html += "<hr style=\"border:0;border-top:1px solid #eee;margin:14px 0;\">";
+  html += "<p style=\"color:#6c757d;font-size:13px;\">เปลี่ยน Wi-Fi หรือใส่ Token ใหม่ (ล้างค่าทั้งหมด)</p>";
   html += "<a href=\"/reset\" class=\"btn btn-gray\" onclick=\"return confirm('ล้างค่าและกลับเข้าโหมดตั้งค่าใหม่?')\">ตั้งค่าใหม่</a></div>";
 
   html += "<div class=\"meta\">API: " + htmlEscape(cfgApiBase) + " · Device: " + htmlEscape(cfgDeviceId) + "</div>";
@@ -386,6 +423,25 @@ void handleFertilizer() {
     openFertilizerValve();
   }
   server.send(200, "text/plain", "OK");
+}
+
+// อัปเดตแค่ Server URL ลง NVS แบบไม่ล้างค่าอื่น — ใช้ตอน IP เครื่อง backend เปลี่ยน (เช่น Wi-Fi หอ)
+// มีผลทันที ไม่ต้องรีสตาร์ท ไม่เสีย Token/Wi-Fi
+void handleSetApi() {
+  String api = server.arg("api"); api.trim();
+  if (api.length() == 0) {
+    server.send(400, "text/html; charset=utf-8",
+      "<meta charset=\"UTF-8\"><body style=\"font-family:sans-serif;text-align:center;padding:40px\">"
+      "<h3>⚠ ต้องกรอก Server URL</h3><a href=\"/\">← กลับ</a></body>");
+    return;
+  }
+  prefs.begin("plantcfg", false);
+  prefs.putString("api", api);
+  prefs.end();
+  cfgApiBase = api;
+  Serial.printf("[config] API base updated -> %s\n", api.c_str());
+  server.sendHeader("Location", "/");
+  server.send(303);
 }
 
 // ล้างค่า + กลับเข้าโหมดตั้งค่า (AP)
@@ -440,6 +496,7 @@ void setup() {
   server.on("/off",        handleOff);
   server.on("/moisture",   handleMoisture);
   server.on("/fertilizer", handleFertilizer);
+  server.on("/setapi",     HTTP_POST, handleSetApi);
   server.on("/reset",      handleReset);
   server.begin();
 
@@ -463,6 +520,18 @@ void loop() {
     lastWifiTry = now;
     Serial.println("[wifi] disconnected -> reconnecting...");
     WiFi.begin(cfgSsid.c_str(), cfgPass.c_str());
+  }
+
+  // mDNS: เข้าหน้าตั้งค่าที่ http://plantpot.local ได้โดยไม่ต้องรู้ IP ของบอร์ด (IP หอเปลี่ยนบ่อย)
+  if (WiFi.status() == WL_CONNECTED && !mdnsUp) {
+    if (MDNS.begin("plantpot")) {
+      MDNS.addService("http", "tcp", 80);
+      Serial.println("[mdns] http://plantpot.local ready");
+    }
+    mdnsUp = true;
+  } else if (WiFi.status() != WL_CONNECTED && mdnsUp) {
+    MDNS.end();
+    mdnsUp = false;
   }
 
   // ปุ่ม BOOT กดค้าง 3 วิระหว่างใช้งาน = ล้างค่า + กลับเข้าโหมดตั้งค่า
