@@ -1,7 +1,7 @@
 # systemd unit — ให้ backend ขึ้นเองตอน Pi บูต ไม่ต้อง ssh เข้าไปสั่ง
 #
 # ติดตั้ง (รันบน Pi ครั้งเดียว):
-#   sudo cp ~/final-project/code/scripts/plant-backend.service /etc/systemd/system/
+#   sudo cp ~/final-project/scripts/plant-backend.service /etc/systemd/system/
 #   sudo systemctl daemon-reload
 #   sudo systemctl enable --now plant-backend
 #
@@ -21,7 +21,7 @@ Requires=docker.service
 [Service]
 Type=simple
 User=pi
-WorkingDirectory=/home/pi/final-project/code/backend
+WorkingDirectory=/home/pi/final-project/backend
 ExecStart=/usr/bin/node src/index.js
 Environment=NODE_ENV=production
 

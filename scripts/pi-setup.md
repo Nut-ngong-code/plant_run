@@ -4,6 +4,13 @@
 
 **ผลลัพธ์ที่จะได้**: `https://plantpi.<ชื่อ-tailnet>.ts.net` เปิดจากมือถือ/โน้ตบุ๊กที่ไหนก็ได้ และ ESP32 ยิงเข้ามาที่ URL นี้
 
+> 📌 **คู่มือนี้สมมติว่า hostname = `plantpi` และ user = `pi`** ถ้าตอนเขียน SD ตั้งไว้เป็นอย่างอื่น
+> (เช่น hostname `respi` / user `respi`) ให้แทนที่ `pi@plantpi.local` ด้วย `<user>@<hostname>.local`
+> หรือ IP ตรง ๆ ทุกจุด และแก้ `User=` กับ `WorkingDirectory=` ใน `plant-backend.service` ขั้นที่ 10 ให้ตรงด้วย
+>
+> **โครงสร้างโฟลเดอร์**: `code/` เป็น root ของ git repo — พอ clone มาเป็น `final-project`
+> เนื้อหาจะอยู่ที่ `~/final-project/backend`, `~/final-project/frontend` **ไม่มีชั้น `code/` คั่น**
+
 ---
 
 ## ขั้นที่ 0 — ของที่ต้องมี
@@ -176,13 +183,13 @@ git clone https://github.com/Nut-ngong-code/plant_run.git final-project
 
 ```bash
 rsync -av --exclude node_modules --exclude .git --exclude dist \
-  "/mnt/e/Akapop/final project/code/" pi@plantpi.local:~/final-project/code/
+  "/mnt/e/Akapop/final project/code/" pi@plantpi.local:~/final-project/
 ```
 
 **ติดตั้ง dependency ของ backend** (ขั้นนี้ช้าที่สุด ~10-15 นาที บน Pi 3 ปล่อยไว้ได้):
 
 ```bash
-cd ~/final-project/code/backend
+cd ~/final-project/backend
 pnpm install
 pnpm exec prisma generate
 ```
@@ -194,7 +201,7 @@ pnpm exec prisma generate
 รันบน WSL ของโน้ตบุ๊ก:
 ```bash
 cd "/mnt/e/Akapop/final project/code/frontend" && pnpm run build
-rsync -av dist/ pi@plantpi.local:~/final-project/code/frontend/dist/
+rsync -av dist/ pi@plantpi.local:~/final-project/frontend/dist/
 ```
 
 ---
@@ -202,7 +209,7 @@ rsync -av dist/ pi@plantpi.local:~/final-project/code/frontend/dist/
 ## ขั้นที่ 7 — เปิดฐานข้อมูล
 
 ```bash
-cd ~/final-project/code/database
+cd ~/final-project/database
 docker compose -f docker-compose.yml -f docker-compose.pi.yml config | grep -A3 volumes
 ```
 ตรวจว่าเห็น `/mnt/ssd/mysql-data` (ไม่ใช่ `mysql_data`) แล้วค่อยสั่ง:
@@ -259,7 +266,7 @@ Funnel จำค่าไว้เองข้ามการรีบูต ไ
 ## ขั้นที่ 9 — ตั้งค่า .env
 
 ```bash
-cd ~/final-project/code/backend
+cd ~/final-project/backend
 cp .env.pi.example .env
 nano .env
 ```
@@ -283,7 +290,7 @@ node src/index.js
 ต้องขึ้น 2 บรรทัด:
 ```
 🌱 Backend ready at http://localhost:3000
-   เสิร์ฟหน้าเว็บจาก /home/pi/final-project/code/frontend/dist (API index อยู่ที่ /_api)
+   เสิร์ฟหน้าเว็บจาก /home/pi/final-project/frontend/dist (API index อยู่ที่ /_api)
 ```
 
 ถ้าบรรทัดที่สองบอกว่า *ไม่พบ frontend/dist* แปลว่าขั้นที่ 6 ยังไม่ได้ส่ง `dist/` มา
@@ -297,7 +304,7 @@ node src/index.js
 ## ขั้นที่ 10 — ให้ backend ขึ้นเองตอนบูต
 
 ```bash
-sudo cp ~/final-project/code/scripts/plant-backend.service /etc/systemd/system/
+sudo cp ~/final-project/scripts/plant-backend.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now plant-backend
 systemctl status plant-backend        # ต้องเป็น active (running)
