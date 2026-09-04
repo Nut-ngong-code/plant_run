@@ -1,0 +1,12 @@
+# ที่อยู่ใหม่ของ onlyBuiltDependencies — pnpm 11 เลิกอ่านฟิลด์ "pnpm" ใน package.json แล้ว
+# (จะเตือนว่า: The "pnpm" field in package.json is no longer read by pnpm)
+#
+# ทำไมต้องมี: ถ้า pnpm บล็อก build script ของ Prisma มันจะไม่สร้าง node_modules/.prisma/client
+# ให้ แล้ว backend จะตายตอนบูตด้วย "@prisma/client did not initialize yet" โดยไม่มีอะไรเตือน
+# ล่วงหน้า — เคยทำระบบบน Pi ล่มมาแล้ว 2026-09-04
+#
+# ฟิลด์ "pnpm" ใน package.json ยังคงไว้ด้วย เผื่อเครื่องที่ใช้ pnpm 10 อยู่
+onlyBuiltDependencies:
+  - '@prisma/client'
+  - '@prisma/engines'
+  - prisma

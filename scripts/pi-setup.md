@@ -261,6 +261,17 @@ tailscale funnel status
 
 Funnel จำค่าไว้เองข้ามการรีบูต ไม่ต้องตั้ง systemd เพิ่ม
 
+> ⚠️ **รูปแบบ URL ที่ใช้เปิดเว็บ** — ต้องเป็น `https://plantpi.tail1234.ts.net` เท่านั้น
+> - **ต้องมี `https://`** — Funnel เปิดเฉพาะพอร์ต 443 ส่วนพอร์ต 80 ไม่ได้เปิด ถ้าพิมพ์โดเมนเปล่า ๆ
+>   เบราว์เซอร์จะลอง `http://` ก่อนแล้วขึ้นว่าเข้าไม่ได้ (`Connection refused`)
+> - **ห้ามใส่ `:3000`** — Funnel รับที่ 443 แล้วส่งต่อเข้า 3000 ให้เองที่ฝั่ง Pi
+>   ถ้าใส่จะได้ error `SSL wrong version number` เพราะพอร์ต 3000 พูด HTTP ธรรมดา
+>
+> ถ้าอยากพิมพ์โดเมนเปล่า ๆ แล้วเข้าได้ (เฉพาะตอนอยู่ในวง Tailscale) เพิ่ม:
+> ```bash
+> sudo tailscale serve --bg --http=80 3000
+> ```
+
 ---
 
 ## ขั้นที่ 9 — ตั้งค่า .env
@@ -380,15 +391,21 @@ docker exec plant_mysql_db mysql -uplant_dev -pdevpassword123 plant_run_db \
 | Strava ล็อกอินแล้วเด้งไป localhost | `FRONTEND_URL` ใน `.env` ยังเป็นค่าเดิม แก้แล้ว `sudo systemctl restart plant-backend` |
 | ESP32 ขึ้น `POST -1` | Server URL ผิด หรือลืม `https://` ข้างหน้า |
 | ESP32 ขึ้น `POST 401` | Token ไม่ตรง — กด 🔑 rotate บนเว็บแล้วใส่ใหม่ |
-| Pi หาไม่เจอหลังย้ายที่ | ssh ผ่าน Tailscale แทนได้เลย: `ssh pi@plantpi` (ไม่ต้องรู้ IP) |
+| Pi หาไม่เจอหลังย้ายที่ | ssh ผ่าน Tailscale แทนได้เลย: `ssh respi@respi` (ไม่ต้องรู้ IP) |
+| `systemctl status` ขึ้น `status=217/USER` | `User=` ใน unit ไม่ตรงกับ user จริงบนเครื่อง (systemd ตายก่อนได้รัน Node เลย) — แก้ `/etc/systemd/system/plant-backend.service` ให้ตรงกับ `whoami` แล้ว `sudo systemctl daemon-reload && sudo systemctl restart plant-backend` |
+| log ขึ้น `@prisma/client did not initialize yet` | client ที่ generate จาก schema หายไป มักเกิดหลังรัน `pnpm install` — `cd ~/final-project/backend && pnpm exec prisma generate` |
+| `prisma generate` ขึ้น `EPERM ... .cache/prisma` | ไฟล์ cache/node_modules เป็นของ root (เคยรันด้วย sudo) — `sudo chown -R $USER:$USER ~/final-project ~/.cache/prisma` แล้ว generate ใหม่ |
+| pnpm เตือน `The "pnpm" field in package.json is no longer read` | pnpm 11 ย้าย setting ไป `pnpm-workspace.yaml` (มีในรีโปแล้ว) ถ้าไม่มีให้ `git pull` — ถ้าปล่อยไว้ pnpm จะบล็อก build script ของ Prisma เงียบ ๆ |
+| เบราว์เซอร์เปิดโดเมนไม่ขึ้น แต่ `<tailnet-ip>:3000` เข้าได้ | พิมพ์ URL ไม่ครบ — ต้องมี `https://` นำหน้า และ **ห้ามใส่ `:3000`** (ดูหัวข้อขั้นที่ 8) |
 
 ## คำสั่งที่ใช้บ่อยหลังติดตั้งเสร็จ
 
 ```bash
-# อัปเดตโค้ดใหม่
+# อัปเดตโค้ดใหม่  (repo ไม่มีชั้น code/ — เนื้อหาอยู่ที่ ~/final-project/backend เลย)
 cd ~/final-project && git pull
-cd code/backend && pnpm install && pnpm exec prisma generate
+cd ~/final-project/backend && pnpm install     # postinstall จะ prisma generate ให้เอง
 sudo systemctl restart plant-backend
+curl -sS localhost:3000/health                 # ต้องได้ {"ok":true,...} ก่อนถือว่าจบ
 
 # ดู log
 journalctl -u plant-backend -f
