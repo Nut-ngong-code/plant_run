@@ -115,10 +115,23 @@ sudo mkfs.ext4 -L plantssd $SSD_PART
 ```bash
 sudo mkdir -p /mnt/ssd
 UUID=$(sudo blkid -s UUID -o value $SSD_PART)
+sudo cp /etc/fstab /etc/fstab.bak
+sudo sed -i '\|[[:space:]]/mnt/ssd[[:space:]]|d' /etc/fstab      # ★ ลบบรรทัดเก่าของ /mnt/ssd ก่อนเสมอ
 echo "UUID=$UUID /mnt/ssd ext4 defaults,noatime,nofail 0 2" | sudo tee -a /etc/fstab
+grep -c '[[:space:]]/mnt/ssd[[:space:]]' /etc/fstab   # ★ ต้องได้ 1 เท่านั้น
+sudo systemctl daemon-reload
 sudo mount -a
-df -h /mnt/ssd          # ต้องเห็น /mnt/ssd ขนาดราว ๆ ที่ lsblk บอก
+findmnt /mnt/ssd        # ★ ต้องเห็น /dev/sdaX — `df` เชื่อไม่ได้ (ดูกล่องเตือนข้างล่าง)
 ```
+
+> 🛑 **ห้ามใช้ `tee -a` เฉย ๆ ถ้าเคยตั้งไว้แล้ว** — ทุกครั้งที่ `mkfs` ใหม่ UUID จะเปลี่ยน ถ้า append
+> บรรทัดใหม่โดยไม่ลบของเก่า จะเหลือ 2 บรรทัดที่ mountpoint เดียวกัน แล้ว **systemd จะยึดบรรทัดแรก
+> (UUID ผีที่ไม่มีอยู่จริง) และมองข้ามบรรทัดที่ถูกต้อง** ผลคือ SSD ไม่ mount ทุกครั้งที่บูต
+> โดย `nofail` กลบ error ให้เงียบสนิท — **เคยทำให้ฐานข้อมูลไปเขียนลง SD card นาน 6 สัปดาห์
+> โดยไม่มีใครรู้ (2026-07-30 → 09-09)**
+>
+> ตรวจด้วย `findmnt /mnt/ssd` เท่านั้น อย่าใช้ `df -h /mnt/ssd` เพราะ `df` ตอบ filesystem ที่ path
+> นั้นตกอยู่จริง — ถ้าไม่ได้ mount มันจะโชว์ SD card (`/dev/mmcblk0p2`) เหมือนทุกอย่างปกติดี
 
 > ⚠️ `SSD_PART` เป็นตัวแปรของ shell ปัจจุบัน ถ้าเผลอปิด terminal หรือ ssh หลุดกลางคัน
 > ต้องตั้งใหม่ก่อนรันคำสั่งที่เหลือ ไม่งั้นจะกลายเป็นค่าว่างแล้วคำสั่งทำงานผิดเป้า
@@ -397,8 +410,22 @@ docker exec plant_mysql_db mysql -uplant_dev -pdevpassword123 plant_run_db \
 | `prisma generate` ขึ้น `EPERM ... .cache/prisma` | ไฟล์ cache/node_modules เป็นของ root (เคยรันด้วย sudo) — `sudo chown -R $USER:$USER ~/final-project ~/.cache/prisma` แล้ว generate ใหม่ |
 | pnpm เตือน `The "pnpm" field in package.json is no longer read` | pnpm 11 ย้าย setting ไป `pnpm-workspace.yaml` (มีในรีโปแล้ว) ถ้าไม่มีให้ `git pull` — ถ้าปล่อยไว้ pnpm จะบล็อก build script ของ Prisma เงียบ ๆ |
 | เบราว์เซอร์เปิดโดเมนไม่ขึ้น แต่ `<tailnet-ip>:3000` เข้าได้ | พิมพ์ URL ไม่ครบ — ต้องมี `https://` นำหน้า และ **ห้ามใส่ `:3000`** (ดูหัวข้อขั้นที่ 8) |
+| `findmnt /mnt/ssd` ไม่มี output (แต่ `df` ดูเหมือนปกติ) | SSD ไม่ได้ mount — เช็ค `grep -c '/mnt/ssd' /etc/fstab` ถ้าได้มากกว่า 1 คือมีบรรทัดซ้ำ systemd ยึดบรรทัดแรก ให้ลบบรรทัด UUID เก่าทิ้ง แล้ว `daemon-reload` + `mount -a` · **อย่าแก้ fstab อย่างเดียวถ้าฐานข้อมูลไปอยู่บน SD แล้ว** ต้องย้ายข้อมูลพร้อมกัน ไม่งั้น reboot ครั้งหน้าจะไปเปิดฐานเก่าบน SSD |
+| `mysqldump` ขึ้น `you need (at least one of) the PROCESS privilege(s)` | เติม `--no-tablespaces` (user `plant_dev` ไม่มีสิทธิ์ระดับ global) หรือ dump ด้วย `-uroot -prootpassword` |
 
 ## คำสั่งที่ใช้บ่อยหลังติดตั้งเสร็จ
+
+**ตรวจสุขภาพระบบทั้งหมดในคำสั่งเดียว** (อ่านอย่างเดียว ปลอดภัย รันได้ทุกเมื่อ):
+
+```bash
+bash ~/final-project/scripts/pi-healthcheck.sh
+```
+ตรวจให้ครบ 7 หมวด: SSD mount + fstab ซ้ำ · MySQL · systemd unit (รวมเช็ค `User=` ให้ตรงเครื่อง) ·
+Prisma Client · เว็บทั้งภายในและผ่าน Funnel · จำนวนข้อมูลในฐาน + heartbeat ของ ESP32 · RAM/ดิสก์/swap
+พร้อมบอกคำสั่งแก้ของแต่ละข้อที่ล้มเหลว · ตั้ง alias ให้เรียกสั้น ๆ ได้:
+```bash
+echo "alias plantcheck='bash ~/final-project/scripts/pi-healthcheck.sh'" >> ~/.bashrc && source ~/.bashrc
+```
 
 ```bash
 # อัปเดตโค้ดใหม่  (repo ไม่มีชั้น code/ — เนื้อหาอยู่ที่ ~/final-project/backend เลย)
@@ -411,6 +438,9 @@ curl -sS localhost:3000/health                 # ต้องได้ {"ok":tru
 journalctl -u plant-backend -f
 
 # สำรองฐานข้อมูล (ทำก่อนวันนำเสนอ!)
-docker exec plant_mysql_db mysqldump -uplant_dev -pdevpassword123 plant_run_db \
+docker exec plant_mysql_db mysqldump -uplant_dev -pdevpassword123 \
+  --single-transaction --routines --events --no-tablespaces plant_run_db \
   > ~/backup-$(date +%F).sql
+tail -1 ~/backup-$(date +%F).sql     # ต้องลงท้ายด้วย "-- Dump completed on ..."
+# --no-tablespaces จำเป็น เพราะ user plant_dev ไม่มีสิทธิ์ PROCESS ระดับ global
 ```
