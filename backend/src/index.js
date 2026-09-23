@@ -14,6 +14,7 @@ import { userRouter } from "./routes/user.js";
 import { actionRouter } from "./routes/action.js";
 import { stravaRouter } from "./routes/strava.js";
 import { cleanupStaleCommands } from "./jobs/cleanupStale.js";
+import { startMqtt, dispatchNext } from "./lib/mqtt.js";
 
 // หน้าเว็บที่ build แล้ว — โหมด production (Raspberry Pi / Tailscale Funnel) เสิร์ฟจาก Express
 // ตัวเดียวกับ API เพราะ Funnel เปิดให้ได้พอร์ตเดียว ตอน dev ไม่มีโฟลเดอร์นี้ก็ข้ามไป (ใช้ Vite proxy เหมือนเดิม)
@@ -62,13 +63,20 @@ app.listen(config.port, () => {
   console.log(`🌱 Backend ready at http://localhost:${config.port}`);
   console.log(hasDist ? `   เสิร์ฟหน้าเว็บจาก ${distDir} (API index อยู่ที่ /_api)` : "   ไม่พบ frontend/dist — โหมด dev (ใช้ Vite :5173)");
   // Sweep stale executing commands ทันทีตอน start (กวาดของค้างจาก process เก่า)
-  cleanupStaleCommands().catch((e) => console.error("[cleanup] startup error:", e));
+  sweepStale("startup");
 });
 
+if (config.mqttPort > 0) startMqtt(config.mqttPort);
+
 // Sweep ทุก 60 วิ — refund แต้มของ command ที่ค้าง (ESP32 ตายระหว่าง execute)
-setInterval(() => {
-  cleanupStaleCommands().catch((e) => console.error("[cleanup] interval error:", e));
-}, 60_000);
+// แล้วปล่อยคำสั่ง pending ที่ต่อคิวอยู่หลังตัวที่ค้าง ให้ ESP32 ที่ยังต่อ MQTT อยู่ได้ทำต่อ
+setInterval(() => sweepStale("interval"), 60_000);
+
+function sweepStale(when) {
+  cleanupStaleCommands()
+    .then(({ deviceIds }) => deviceIds.forEach(dispatchNext))
+    .catch((e) => console.error(`[cleanup] ${when} error:`, e));
+}
 
 function renderIndex() {
   const groups = [
@@ -89,8 +97,17 @@ function renderIndex() {
       title: "Device (ESP32)",
       routes: [
         { m: "POST", path: "/api/device", desc: "ผูกอุปกรณ์กับผู้ใช้ { userId, deviceId, displayName }" },
-        { m: "GET", path: "/api/device/:deviceId/command", desc: "ESP32 poll คำสั่ง pending" },
+        { m: "GET", path: "/api/device/:deviceId/command", desc: "ESP32 poll คำสั่ง pending (สำรอง — firmware ปัจจุบันรับคำสั่งผ่าน MQTT)" },
         { m: "POST", path: "/api/device/:deviceId/command/:cmdId/ack", desc: "ESP32 แจ้งผลหลังรันคำสั่ง { status: success|failed }" },
+      ],
+    },
+    {
+      title: "MQTT (ESP32 — port MQTT_PORT, ค่าเริ่มต้น 1883)",
+      routes: [
+        { m: "SUB", path: "plant/:deviceId/cmd", desc: "ESP32 รับคำสั่ง {id, type, durationSeconds} — backend ส่งทันทีที่ผู้ใช้กด" },
+        { m: "PUB", path: "plant/:deviceId/ack", desc: "ESP32 แจ้งผล {id, status: success|failed}" },
+        { m: "PUB", path: "plant/:deviceId/sensor", desc: "ESP32 ส่งความชื้น {moisturePercent}" },
+        { m: "PUB", path: "plant/:deviceId/status", desc: "online (retained) · offline = Last Will" },
       ],
     },
     {
@@ -115,7 +132,7 @@ function renderIndex() {
     },
   ];
 
-  const methodColor = { GET: "#1D9E75", POST: "#BA7517", PUT: "#7F77DD", DELETE: "#C84343" };
+  const methodColor = { GET: "#1D9E75", POST: "#BA7517", PUT: "#7F77DD", DELETE: "#C84343", SUB: "#2B7BB9", PUB: "#2B7BB9" };
   const sections = groups
     .map(
       (g) => `

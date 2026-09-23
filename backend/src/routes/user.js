@@ -2,6 +2,7 @@ import { Router } from "express";
 
 import { prisma } from "../lib/prisma.js";
 import { HttpError } from "../middleware/error.js";
+import { isDeviceOnline } from "../lib/mqtt.js";
 
 export const userRouter = Router();
 
@@ -29,12 +30,9 @@ userRouter.get("/:id/dashboard", async (req, res) => {
     orderBy: { id: "asc" },
   });
 
-  // คำนวณ isOnline จาก lastSeenAt — ถ้า heartbeat (sensor/poll/ack) เกิน threshold
-  // ถือว่า device หลุด ไม่พึ่งคอลัมน์ isOnline ใน DB ที่ค้างเป็น true ตลอด
-  const ONLINE_THRESHOLD_MS = 60_000;
+  // isOnline: ต่อ MQTT อยู่ = online ทันที · หลุด = offline ทันที (ดู lib/mqtt.js)
+  // ไม่พึ่งคอลัมน์ isOnline ใน DB ที่ค้างเป็น true ตลอด
   const nowMs = Date.now();
-  const isDeviceOnline = (lastSeenAt) =>
-    lastSeenAt ? nowMs - new Date(lastSeenAt).getTime() < ONLINE_THRESHOLD_MS : false;
 
   // สัปดาห์ปัจจุบัน เริ่มวันจันทร์ 00:00 local
   const now = new Date();
@@ -67,7 +65,7 @@ userRouter.get("/:id/dashboard", async (req, res) => {
       id: d.id,
       deviceId: d.deviceId,
       displayName: d.displayName,
-      isOnline: isDeviceOnline(d.lastSeenAt),
+      isOnline: isDeviceOnline(d, nowMs),
       lastSeenAt: d.lastSeenAt,
       latestMoisture: d.soilLogs[0] ?? null,
     })),

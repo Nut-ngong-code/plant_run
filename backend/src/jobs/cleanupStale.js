@@ -17,10 +17,10 @@ export async function cleanupStaleCommands() {
       status: "executing",
       executedAt: { lt: cutoff },
     },
-    select: { id: true, userId: true, pointsDeducted: true },
+    select: { id: true, userId: true, deviceId: true, pointsDeducted: true },
   });
 
-  if (stale.length === 0) return { cleaned: 0 };
+  if (stale.length === 0) return { cleaned: 0, deviceIds: [] };
 
   const refundsByUser = new Map();
   for (const a of stale) {
@@ -45,5 +45,5 @@ export async function cleanupStaleCommands() {
   console.log(
     `[cleanup] marked ${stale.length} stale commands as failed · refunded ${[...refundsByUser.values()].reduce((s, n) => s + n, 0)} pts across ${refundsByUser.size} user(s)`,
   );
-  return { cleaned: stale.length };
+  return { cleaned: stale.length, deviceIds: [...new Set(stale.map((a) => a.deviceId))] };
 }

@@ -272,6 +272,16 @@ tailscale funnel status
 
 > ถ้าขึ้น error ว่า Funnel ไม่ได้เปิดใช้งาน ให้เข้า https://login.tailscale.com/admin/dns เปิด **MagicDNS + HTTPS Certificates** ก่อน แล้วสั่งใหม่ ครั้งแรกที่ใช้ Tailscale จะให้กดยืนยันเปิด Funnel ผ่านลิงก์ที่มันพิมพ์ออกมา
 
+**เปิด Funnel ให้ MQTT (ESP32 รับคำสั่งผ่านช่องนี้) — พอร์ต 8443:**
+
+```bash
+sudo tailscale funnel --bg --tls-terminated-tcp=8443 tcp://localhost:1883
+tailscale funnel status      # ต้องเห็นทั้ง :443 → 127.0.0.1:3000 และ :8443 → tcp://localhost:1883
+```
+
+> Funnel เปิดได้แค่พอร์ต 443 / 8443 / 10000 — เว็บใช้ 443 ไปแล้ว MQTT จึงใช้ 8443
+> `--tls-terminated-tcp` = Funnel ถอด TLS ให้ แล้วส่ง MQTT ธรรมดาเข้าพอร์ต 1883 ของ backend (ESP32 ต่อแบบเข้ารหัสจากภายนอก)
+
 Funnel จำค่าไว้เองข้ามการรีบูต ไม่ต้องตั้ง systemd เพิ่ม
 
 > ⚠️ **รูปแบบ URL ที่ใช้เปิดเว็บ** — ต้องเป็น `https://plantpi.tail1234.ts.net` เท่านั้น
@@ -357,14 +367,17 @@ plantpi.tail1234.ts.net
 
 ## ขั้นที่ 12 — ตั้ง ESP32
 
-1. Verify + upload `esp32_v-1.ino` ตัวล่าสุดจาก Arduino IDE (ตัวที่รองรับ HTTPS แล้ว)
+1. Arduino IDE → Library Manager → ติดตั้ง **PubSubClient** (by Nick O'Leary) → Verify + upload `esp32_v-1.ino` ตัวล่าสุด (รุ่น MQTT)
 2. กดปุ่ม BOOT ค้าง 3 วิ → เข้าโหมดตั้งค่า → ต่อ Wi-Fi ชื่อ `PlantPot-Setup` ด้วยมือถือ
 3. กรอกในฟอร์ม:
    - Wi-Fi + รหัส
    - Device ID: `POT-001`
    - Token: กด 🔑 rotate บนหน้าเว็บเพื่อขอใหม่ แล้ววาง
    - **Server URL: `https://plantpi.tail1234.ts.net`** ← ไม่ต้องใส่ `:3000` เพราะ Funnel รับที่ 443 แล้วส่งต่อเอง
-4. บันทึก → ESP32 รีบูต → ดู Serial Monitor ต้องเห็น `[sensor] POST 201`
+4. บันทึก → ESP32 รีบูต → ดู Serial Monitor ต้องเห็น `[mqtt] connected` ตามด้วย `[sensor] publish ok`
+   (ถ้าเห็น `connect failed state=4` = token ผิด · `state=-2` = ต่อพอร์ต 8443 ไม่ได้ → เช็ค `tailscale funnel status`)
+
+> **มี MQTT แล้วยังรับ firmware รุ่นเดิมได้** — ถ้า MQTT มีปัญหา flash `firmware/esp32_polling/` กลับได้ทันที backend ยังรองรับ HTTP polling ครบ
 
 หลังจากนี้ย้ายไปต่อ Wi-Fi ที่ไหนก็แค่กด BOOT ค้าง 3 วิ กรอก Wi-Fi ใหม่ **ส่วน Server URL ไม่ต้องแตะอีกเลย**
 
@@ -378,7 +391,7 @@ df -h /mnt/ssd                              # ~117G
 free -h                                     # Swap ~2.0Gi
 docker ps                                   # plant_mysql_db (healthy)
 systemctl is-active plant-backend           # active
-tailscale funnel status                     # ชี้ไป 127.0.0.1:3000
+tailscale funnel status                     # :443 → 127.0.0.1:3000 และ :8443 → tcp://localhost:1883
 curl -s https://plantpi.tail1234.ts.net/health   # {"ok":true,...}
 ```
 

@@ -1,15 +1,14 @@
 #include <WiFi.h>
 #include <WebServer.h>
-#include <WiFiClientSecure.h>  // MQTT over TLS ผ่าน Tailscale Funnel
-#include <PubSubClient.h>      // MQTT client — ติดตั้งจาก Library Manager: "PubSubClient" by Nick O'Leary
+#include <HTTPClient.h>
+#include <WiFiClientSecure.h>  // คุยกับ backend ผ่าน HTTPS (Tailscale Funnel เปิดแต่ https)
 #include <Preferences.h>   // เก็บค่าตั้งค่า (Wi-Fi/Token) ลง NVS ถาวร
 #include <DNSServer.h>     // captive portal — ดึงหน้าตั้งค่าให้เด้งเอง
 #include <ESPmDNS.h>       // เข้าหน้าตั้งค่าที่ http://plantpot.local โดยไม่ต้องรู้ IP ของบอร์ด
 
 // ============================================================================
-//  วิ่งเพื่อชีวิตของต้นไม้ในกระถาง — ESP32 firmware (MQTT)
-//  ต่อ MQTT broker ค้างไว้ → backend ส่งคำสั่งรดน้ำ/ปุ๋ยลงมาทันทีที่ผู้ใช้กด ไม่ต้องถามทุก 5 วิ
-//  (รุ่น HTTP polling เดิมเก็บไว้ที่ firmware/esp32_polling/ — backend รองรับทั้งสองรุ่น)
+//  วิ่งเพื่อชีวิตของต้นไม้ในกระถาง — ESP32 firmware (รุ่นสำรอง: HTTP polling — ถาม /command ทุก 5 วิ)
+//  ตัวหลักย้ายไปใช้ MQTT แล้วที่ esp32_v-1/ · backend ยังรองรับรุ่นนี้ครบ (flash กลับได้ทันทีถ้า MQTT มีปัญหา)
 //  *** ไม่มีค่าใดต้องแก้ในโค้ดนี้ — Wi-Fi / Device ID / Token ตั้งผ่านหน้าเว็บ ***
 //  ครั้งแรก (ยังไม่ตั้งค่า) บอร์ดจะเปิด Wi-Fi ชื่อ "PlantPot-Setup" ให้เข้าไปกรอก
 // ============================================================================
@@ -19,7 +18,6 @@ Preferences prefs;
 String cfgSsid, cfgPass, cfgDeviceId, cfgToken, cfgApiBase;
 // ค่าเริ่มต้นตอนยังไม่เคยตั้งค่า — แก้ได้ในฟอร์มตั้งค่า (AP) และที่หน้าเว็บ local (/setapi)
 // รองรับทั้ง http://<ip>:3000 (backend ในวง LAN) และ https://xxx.ts.net (Tailscale Funnel — ใช้ได้ทุกที่)
-// MQTT ใช้ host เดียวกัน: https:// → MQTT over TLS พอร์ต 8443 · http:// → MQTT ธรรมดาพอร์ต 1883
 const char* DEFAULT_API_BASE = "http://192.168.1.134:3000";
 
 // ===== 2. Config portal (AP mode) =====
@@ -44,15 +42,10 @@ const int           AUTO_WATER_ON_PCT  = 10;     // เริ่มรดเม�
 const int           AUTO_WATER_OFF_PCT = 25;     // หยุดเมื่อ > นี้ (กลับสู่ dry zone)
 const unsigned long AUTO_WATER_MAX_MS  = 60000;  // safety cap — เปิดต่อเนื่องเกินนี้ = sensor น่าจะพัง
 const unsigned long FERT_DURATION_MS   = 5000;   // ปุ่มปุ๋ย local = 5 วิ
-const unsigned long SENSOR_POST_MS     = 300000; // ส่งความชื้นทุก 5 นาที
+const unsigned long SENSOR_POST_MS     = 300000; // POST /api/sensor ทุก 5 นาที
+const unsigned long COMMAND_POLL_MS    = 5000;   // poll /command ทุก 5 วิ
+const unsigned long CLOUD_HEARTBEAT_MS = 30000;  // ระหว่างคำสั่ง cloud ยิง sensor ถี่ขึ้นเป็น heartbeat กัน false-offline
 const unsigned long WIFI_RETRY_MS      = 30000;  // ลอง reconnect Wi-Fi ทุก 30 วิ เมื่อหลุด (ไม่ค้าง offline)
-
-// ===== 5b. MQTT =====
-const uint16_t      MQTT_TLS_PORT      = 8443;   // Funnel: tailscale funnel --bg --tls-terminated-tcp=8443 tcp://localhost:1883
-const uint16_t      MQTT_PLAIN_PORT    = 1883;   // backend ในวง LAN (ไม่เข้ารหัส — ใช้ตอน dev)
-const uint16_t      MQTT_KEEPALIVE_S   = 30;     // ping ทุก 30 วิ = heartbeat (backend ถือว่า offline ทันทีที่หลุด)
-const unsigned long MQTT_RETRY_MS      = 5000;   // ต่อไม่ติด → ลองใหม่ทุก 5 วิ
-const unsigned long MQTT_AUTH_RETRY_MS = 60000;  // token ผิด (เช่น เพิ่ง rotate) → ลองห่างขึ้น ไม่ถล่ม broker
 
 // ===== 6. State =====
 WebServer server(80);
@@ -73,14 +66,8 @@ unsigned long cloudStart       = 0;
 unsigned long cloudDurationMs  = 0;
 
 unsigned long lastSensorPost  = 0;
+unsigned long lastCommandPoll = 0;
 unsigned long lastWifiTry     = 0;
-unsigned long lastMqttTry     = 0;
-bool          mqttAuthFailed  = false;  // ครั้งล่าสุดต่อไม่ติดเพราะ token ผิด
-
-long          pendingAckId     = -1;    // ack ที่ยังส่งไม่ออก (MQTT หลุดตอนทำเสร็จ) — ส่งซ้ำตอนต่อกลับ
-String        pendingAckStatus = "";
-long          recentCmdIds[4]  = {-1, -1, -1, -1};  // กันคำสั่งซ้ำ (QoS 1 ส่งซ้ำได้) — ปั๊มต้องไม่ทำงานสองรอบ
-int           recentCmdPos     = 0;
 
 // ===== 7. NVS config helpers =====
 // คืน true ถ้ามีค่าครบพอใช้งาน (Wi-Fi + Device ID + Token)
@@ -137,105 +124,67 @@ void closeAll() {
   digitalWrite(valveFertilizerPin, HIGH);
 }
 
-// ===== 9. Cloud client (MQTT) =====
-// ต่อ broker ครั้งเดียวแล้วค้างไว้ — backend "ส่ง" คำสั่งลงมาเอง (push) ไม่ต้องถามทุก 5 วิ
-//   subscribe  plant/<id>/cmd     ← {id, type, durationSeconds}
-//   publish    plant/<id>/ack     → {id, status}
-//   publish    plant/<id>/sensor  → {moisturePercent}
-//   publish    plant/<id>/status  → "online" (retained) · "offline" = Last Will ที่ broker ส่งแทนเมื่อบอร์ดหลุด
-// ยืนยันตัวตน: username = Device ID, password = Device Token (ตัวเดียวกับที่ใช้กับเว็บ)
-WiFiClientSecure mqttSecure;   // https:// → MQTT over TLS
-WiFiClient       mqttPlain;    // http://  → MQTT ธรรมดา (วง LAN)
-PubSubClient     mqtt;
-String           mqttHost;     // ต้องเป็น global — PubSubClient เก็บแค่ pointer ของ host ไว้
-uint16_t         mqttPort = 0;
-String           topicCmd, topicAck, topicSensor, topicStatus;
+// ===== 9. Cloud client =====
+// รองรับทั้ง http:// (backend ในวง LAN) และ https:// (Tailscale Funnel / cloud)
+// เลือกจาก scheme ของ cfgApiBase อัตโนมัติ — ไม่ต้องตั้งอะไรเพิ่มในฟอร์ม
+WiFiClientSecure secureClient;   // global เพื่อให้ TLS session อยู่ข้าม request (เร็วขึ้น)
+WiFiClient       plainClient;
+bool             secureReady = false;
 
 bool usingHttps() { return cfgApiBase.startsWith("https://"); }
 
-// ดึง host ออกจาก Server URL: "https://respi.xxx.ts.net" / "http://192.168.1.134:3000" → host อย่างเดียว
-String hostFromUrl(const String& url) {
-  String s = url;
-  int p = s.indexOf("://");
-  if (p >= 0) s = s.substring(p + 3);
-  int end = s.length();
-  int colon = s.indexOf(':'), slash = s.indexOf('/');
-  if (colon >= 0 && colon < end) end = colon;
-  if (slash >= 0 && slash < end) end = slash;
-  return s.substring(0, end);
-}
-
-// เรียกตอน boot และทุกครั้งที่ Server URL เปลี่ยน (/setapi)
-void mqttSetup() {
-  topicCmd    = "plant/" + cfgDeviceId + "/cmd";
-  topicAck    = "plant/" + cfgDeviceId + "/ack";
-  topicSensor = "plant/" + cfgDeviceId + "/sensor";
-  topicStatus = "plant/" + cfgDeviceId + "/status";
-
-  if (mqtt.connected()) mqtt.disconnect();
-  mqttHost = hostFromUrl(cfgApiBase);
+// เตรียม HTTPClient ให้พร้อมยิง — คืน false ถ้าเปิด connection ไม่ได้
+bool beginRequest(HTTPClient& http, const String& url) {
+  bool ok;
   if (usingHttps()) {
-    // ไม่ verify certificate — ESP32 ไม่มีนาฬิกาจริงตอนบูตและ root CA กินแฟลช
-    // ข้อมูลยังถูกเข้ารหัสระหว่างทาง (token ไม่โผล่บนเน็ต) แค่ไม่กัน MITM แบบเต็มรูปแบบ
-    mqttSecure.setInsecure();
-    mqttSecure.setHandshakeTimeout(8);   // วินาที — กัน TLS handshake ค้างนานจน loop สะดุด
-    mqtt.setClient(mqttSecure);
-    mqttPort = MQTT_TLS_PORT;
+    if (!secureReady) {
+      // ไม่ verify certificate — ESP32 ไม่มีนาฬิกาจริงตอนบูตและ root CA กินแฟลช
+      // ข้อมูลยังถูกเข้ารหัสระหว่างทาง (token ไม่โผล่บนเน็ต) แค่ไม่กัน MITM แบบเต็มรูปแบบ
+      secureClient.setInsecure();
+      secureReady = true;
+    }
+    ok = http.begin(secureClient, url);
+    // TLS handshake ใช้เวลามากกว่า plain HTTP หลายเท่า ต้องเผื่อ timeout ไม่งั้น fail ทุกครั้ง
+    http.setConnectTimeout(8000);
+    http.setTimeout(8000);
   } else {
-    mqtt.setClient(mqttPlain);
-    mqttPort = MQTT_PLAIN_PORT;
+    ok = http.begin(plainClient, url);
+    http.setConnectTimeout(3000);   // กัน block loop เมื่อ backend up-but-unresponsive
+    http.setTimeout(3000);
   }
-  mqtt.setServer(mqttHost.c_str(), mqttPort);
-  mqtt.setKeepAlive(MQTT_KEEPALIVE_S);
-  mqtt.setSocketTimeout(8);
-  mqtt.setBufferSize(512);
-  mqtt.setCallback(onMqttMessage);
-  lastMqttTry = millis() - MQTT_RETRY_MS;  // ต่อทันทีในรอบ loop ถัดไป
+  http.setReuse(true);              // keep-alive — ไม่ต้อง handshake ใหม่ทุก 5 วิ
+  return ok;
 }
 
-void flushPendingAck() {
-  if (pendingAckId < 0 || !mqtt.connected()) return;
-  String body = String("{\"id\":") + pendingAckId + ",\"status\":\"" + pendingAckStatus + "\"}";
-  if (mqtt.publish(topicAck.c_str(), body.c_str())) {
-    Serial.printf("[ack] id=%ld status=%s\n", pendingAckId, pendingAckStatus.c_str());
-    pendingAckId = -1;
-  }
+void addAuthHeaders(HTTPClient& http) {
+  http.addHeader("Content-Type", "application/json");
+  http.addHeader("Authorization", String("Bearer ") + cfgToken);
 }
 
-// ยังไม่ได้ต่อก็ไม่หาย — เก็บไว้ส่งตอนต่อกลับ (backend รอได้ 180 วิก่อน cleanup คืนแต้ม)
-void ackCommand(long id, const char* status) {
-  pendingAckId     = id;
-  pendingAckStatus = status;
-  flushPendingAck();
-}
-
-bool mqttConnect() {
-  String clientId = "plantpot-" + cfgDeviceId;
-  Serial.printf("[mqtt] connecting %s:%u ...\n", mqttHost.c_str(), mqttPort);
-  // Last Will: ถ้าบอร์ดหลุดโดยไม่บอกลา broker จะประกาศ "offline" แทน
-  bool ok = mqtt.connect(clientId.c_str(), cfgDeviceId.c_str(), cfgToken.c_str(),
-                         topicStatus.c_str(), 1, true, "offline");
-  if (!ok) {
-    int st = mqtt.state();
-    mqttAuthFailed = (st == MQTT_CONNECT_BAD_CREDENTIALS || st == MQTT_CONNECT_UNAUTHORIZED);
-    Serial.printf("[mqtt] connect failed state=%d%s\n", st,
-                  mqttAuthFailed ? " (token ไม่ถูกต้อง — rotate แล้วหรือยัง? ใส่ใหม่ที่ปุ่มตั้งค่าใหม่/BOOT ค้าง 3 วิ)" : "");
-    return false;
-  }
-  mqttAuthFailed = false;
-  mqtt.publish(topicStatus.c_str(), "online", true);
-  mqtt.subscribe(topicCmd.c_str(), 1);   // backend ส่งคำสั่งที่ค้างระหว่างออฟไลน์ให้หลัง subscribe
-  Serial.println("[mqtt] connected");
-  flushPendingAck();
-  lastSensorPost = millis() - SENSOR_POST_MS;  // ส่งความชื้นทันทีที่ต่อได้
-  return true;
-}
-
-void publishSensor() {
+void postSensor() {
+  if (WiFi.status() != WL_CONNECTED) return;
+  HTTPClient http;
+  String url = cfgApiBase + "/api/sensor";
+  if (!beginRequest(http, url)) { Serial.println("[sensor] begin failed"); return; }
+  addAuthHeaders(http);
   int pct = readMoisturePercent();
-  String body = String("{\"moisturePercent\":") + pct + "}";
-  bool ok = mqtt.publish(topicSensor.c_str(), body.c_str());
-  Serial.printf("[sensor] publish %s  pct=%d\n", ok ? "ok" : "FAILED", pct);
+  String body = String("{\"deviceId\":\"") + cfgDeviceId +
+                "\",\"moisturePercent\":" + pct + "}";
+  int code = http.POST(body);
+  Serial.printf("[sensor] POST %d  pct=%d\n", code, pct);
+  http.end();
+}
+
+void ackCommand(long id, const char* status) {
+  if (WiFi.status() != WL_CONNECTED) return;
+  HTTPClient http;
+  String url = cfgApiBase + "/api/device/" + cfgDeviceId + "/command/" + String(id) + "/ack";
+  if (!beginRequest(http, url)) { Serial.println("[ack] begin failed"); return; }
+  addAuthHeaders(http);
+  String body = String("{\"status\":\"") + status + "\"}";
+  int code = http.POST(body);
+  Serial.printf("[ack] id=%ld status=%s -> http %d\n", id, status, code);
+  http.end();
 }
 
 bool extractJsonInt(const String& s, const String& key, long* out) {
@@ -256,45 +205,36 @@ bool extractJsonStr(const String& s, const String& key, String* out) {
   return true;
 }
 
-bool seenCommand(long id) {
-  for (long r : recentCmdIds) if (r == id) return true;
-  return false;
-}
-void rememberCommand(long id) {
-  recentCmdIds[recentCmdPos] = id;
-  recentCmdPos = (recentCmdPos + 1) % 4;
-}
+void pollCommand() {
+  if (WiFi.status() != WL_CONNECTED) return;
+  if (isCloudActive) return;
 
-// callback จาก mqtt.loop() — มีคำสั่งใหม่ส่งลงมา
-void onMqttMessage(char* topic, byte* payload, unsigned int len) {
-  if (topicCmd != topic) return;
-  String msg;
-  msg.reserve(len);
-  for (unsigned int i = 0; i < len; i++) msg += (char)payload[i];
-
-  long   id  = -1;
-  String type;
-  long   dur = 5;
-  if (!extractJsonInt(msg, "id", &id) || !extractJsonStr(msg, "type", &type)) {
-    Serial.printf("[cmd] bad payload: %s\n", msg.c_str());
+  HTTPClient http;
+  String url = cfgApiBase + "/api/device/" + cfgDeviceId + "/command";
+  if (!beginRequest(http, url)) { Serial.println("[cmd] begin failed"); return; }
+  addAuthHeaders(http);
+  int code = http.GET();
+  if (code != 200) {
+    Serial.printf("[cmd] GET http %d\n", code);
+    http.end();
     return;
   }
-  extractJsonInt(msg, "durationSeconds", &dur);
+  String resp = http.getString();
+  http.end();
+
+  if (resp.indexOf("\"command\":null") >= 0) return;
+
+  long  id   = -1;
+  String type;
+  long  dur  = 5;
+  if (!extractJsonInt(resp, "id",   &id))   return;
+  if (!extractJsonStr(resp, "type", &type)) return;
+  extractJsonInt(resp, "durationSeconds", &dur);
   if (dur < 1)   dur = 1;
   if (dur > 120) dur = 120;
 
-  if (seenCommand(id)) {                  // QoS 1 ส่งซ้ำ — ทำไปแล้ว ไม่รดซ้ำ
-    Serial.printf("[cmd] duplicate id=%ld ignored\n", id);
-    return;
-  }
-  rememberCommand(id);
-  if (isCloudActive) {                    // backend ส่งทีละคำสั่งอยู่แล้ว — ถ้ามาซ้อนแปลว่าสถานะไม่ตรงกัน
-    Serial.printf("[cmd] busy with id=%ld -> reject id=%ld\n", cloudCmdId, id);
-    ackCommand(id, "failed");             // คืนแต้มทันที ดีกว่าให้ผู้ใช้รอ cleanup
-    return;
-  }
-
   Serial.printf("[cmd] start id=%ld type=%s dur=%lds\n", id, type.c_str(), dur);
+
   cloudCmdId      = id;
   cloudType       = type;
   cloudDurationMs = (unsigned long)dur * 1000;
@@ -346,7 +286,7 @@ void handleConfigRoot() {
     "<label>รหัส Wi-Fi</label><input name=\"pass\" type=\"password\" placeholder=\"รหัสผ่าน Wi-Fi\">"
     "<label>Device ID</label><input name=\"devid\" placeholder=\"เช่น POT-001\" value=\"" + htmlEscape(cfgDeviceId) + "\">"
     "<label>Device Token</label><input name=\"token\" placeholder=\"" + tokPh + "\">"
-    "<label>Server URL <span class=\"hint\">(ใช้ทั้งเว็บและ MQTT — https:// = พอร์ต 8443 · http:// = 1883 · เว้นว่าง = ใช้ค่าเดิม)</span></label>"
+    "<label>Server URL <span class=\"hint\">(IP เครื่องที่รันเซิร์ฟเวอร์ — เว้นว่าง = ใช้ค่าเดิม)</span></label>"
     "<input name=\"api\" value=\"" + htmlEscape(cfgApiBase.length() ? cfgApiBase : String(DEFAULT_API_BASE)) + "\">"
     "<button type=\"submit\">บันทึก แล้วเชื่อมต่อ</button></form></div>"
     "<script>fetch('/scan').then(r=>r.json()).then(list=>{var s=document.getElementById('ssidsel');"
@@ -463,9 +403,7 @@ void handleRoot() {
   html += "<p style=\"color:#6c757d;font-size:13px;\">เปลี่ยน Wi-Fi หรือใส่ Token ใหม่ (ล้างค่าทั้งหมด)</p>";
   html += "<a href=\"/reset\" class=\"btn btn-gray\" onclick=\"return confirm('ล้างค่าและกลับเข้าโหมดตั้งค่าใหม่?')\">ตั้งค่าใหม่</a></div>";
 
-  html += "<div class=\"meta\">MQTT: " + htmlEscape(mqttHost) + ":" + String(mqttPort) +
-          (mqtt.connected() ? " ✅ เชื่อมต่อแล้ว" : (mqttAuthFailed ? " ❌ Token ไม่ถูกต้อง" : " ⏳ กำลังเชื่อมต่อ")) +
-          " · Device: " + htmlEscape(cfgDeviceId) + "</div>";
+  html += "<div class=\"meta\">API: " + htmlEscape(cfgApiBase) + " · Device: " + htmlEscape(cfgDeviceId) + "</div>";
 
   html += "<script>";
   html += "setInterval(() => { fetch('/moisture').then(r=>r.text()).then(d=>document.getElementById('moistureValue').innerText=d); }, 3000);";
@@ -503,7 +441,6 @@ void handleSetApi() {
   prefs.end();
   cfgApiBase = api;
   Serial.printf("[config] API base updated -> %s\n", api.c_str());
-  mqttSetup();   // ต่อ broker ใหม่ที่ host ใหม่ทันที
   server.sendHeader("Location", "/");
   server.send(303);
 }
@@ -552,8 +489,8 @@ void setup() {
     Serial.print("\nWi-Fi connected. Local UI -> http://");
     Serial.println(WiFi.localIP());
   }
-  mqttSetup();
-  Serial.printf("Cloud target -> %s (MQTT %s:%u)\n", cfgApiBase.c_str(), mqttHost.c_str(), mqttPort);
+  Serial.print("Cloud target -> ");
+  Serial.println(cfgApiBase);
 
   server.on("/",           handleRoot);
   server.on("/on",         handleOn);
@@ -564,6 +501,8 @@ void setup() {
   server.on("/reset",      handleReset);
   server.begin();
 
+  // ให้ post ความชื้นแรกเกิดใน loop (หลัง UI พร้อม) แทน blocking ใน setup — #5
+  lastSensorPost = millis() - SENSOR_POST_MS;
 }
 
 void loop() {
@@ -650,23 +589,16 @@ void loop() {
     else                 closeAll();
   }
 
-  // --- Cloud (MQTT) ---
-  if (WiFi.status() == WL_CONNECTED) {
-    if (mqtt.connected()) {
-      mqtt.loop();   // รับคำสั่ง + ส่ง keepalive ping (heartbeat)
-      if (now - lastSensorPost >= SENSOR_POST_MS) {
-        lastSensorPost = now;
-        publishSensor();
-      }
-    } else {
-      // connect (โดยเฉพาะ TLS handshake) บล็อก loop ได้หลายวินาที — ห้ามทำตอนปั๊มกำลังทำงานแบบจับเวลา
-      // ไม่งั้นปั๊มจะปิดช้ากว่ากำหนด (ack ที่ค้างจะถูกส่งตอนต่อกลับ backend รอได้ 180 วิ)
-      bool pumpTimed = isCloudActive || isFertilizing || autoWaterActive;
-      unsigned long wait = mqttAuthFailed ? MQTT_AUTH_RETRY_MS : MQTT_RETRY_MS;
-      if (!pumpTimed && now - lastMqttTry >= wait) {
-        lastMqttTry = now;
-        mqttConnect();
-      }
-    }
+  // --- Cloud sync (ทำตามรอบ ไม่บล็อก loop) ---
+  // ระหว่างคำสั่ง cloud ยิง sensor ถี่ขึ้น (30 วิ) เป็น heartbeat กัน dashboard เด้ง offline
+  // ทั้งที่ปั๊มยังทำงาน (pollCommand ไม่ส่ง heartbeat ตอน isCloudActive) — #6
+  unsigned long postInterval = isCloudActive ? CLOUD_HEARTBEAT_MS : SENSOR_POST_MS;
+  if (now - lastSensorPost >= postInterval) {
+    lastSensorPost = now;
+    postSensor();
+  }
+  if (now - lastCommandPoll >= COMMAND_POLL_MS) {
+    lastCommandPoll = now;
+    pollCommand();
   }
 }

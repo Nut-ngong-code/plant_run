@@ -12,6 +12,14 @@ export function generateToken() {
   return crypto.randomBytes(32).toString("hex"); // 64 hex chars
 }
 
+// เทียบ plaintext token กับ hash ใน DB แบบ constant-time — ใช้ร่วมกันทั้ง HTTP (Bearer) และ MQTT (password)
+export function tokenMatches(device, token) {
+  if (!device?.authTokenHash || !token) return false;
+  const incoming = Buffer.from(hashToken(token), "hex");
+  const stored = Buffer.from(device.authTokenHash, "hex");
+  return incoming.length === stored.length && crypto.timingSafeEqual(incoming, stored);
+}
+
 // ตรวจ "Authorization: Bearer <token>" กับ device.authTokenHash ของ deviceId
 // ใน req.params.deviceId หรือ req.body.deviceId — แล้วแนบ device ที่ verify แล้วเข้ากับ req.device
 export async function requireDeviceAuth(req, _res, next) {
@@ -32,11 +40,7 @@ export async function requireDeviceAuth(req, _res, next) {
       throw new HttpError(401, "Device has no token — re-register on /add-device");
     }
 
-    const incoming = Buffer.from(hashToken(token), "hex");
-    const stored = Buffer.from(device.authTokenHash, "hex");
-    if (incoming.length !== stored.length || !crypto.timingSafeEqual(incoming, stored)) {
-      throw new HttpError(401, "Invalid token");
-    }
+    if (!tokenMatches(device, token)) throw new HttpError(401, "Invalid token");
 
     // Heartbeat: ทุก authenticated request นับเป็นสัญญาณว่าอุปกรณ์ยัง alive
     // dashboard คำนวณ isOnline จาก lastSeenAt + threshold ตอนอ่าน
