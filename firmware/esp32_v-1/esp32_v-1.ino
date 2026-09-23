@@ -5,6 +5,7 @@
 #include <Preferences.h>   // เก็บค่าตั้งค่า (Wi-Fi/Token) ลง NVS ถาวร
 #include <DNSServer.h>     // captive portal — ดึงหน้าตั้งค่าให้เด้งเอง
 #include <ESPmDNS.h>       // เข้าหน้าตั้งค่าที่ http://plantpot.local โดยไม่ต้องรู้ IP ของบอร์ด
+#include <esp_system.h>    // esp_reset_reason() — บอร์ดรีเซ็ตเพราะอะไร (ไฟตก/watchdog/...)
 
 // ============================================================================
 //  วิ่งเพื่อชีวิตของต้นไม้ในกระถาง — ESP32 firmware (MQTT)
@@ -82,6 +83,40 @@ long          pendingAckId     = -1;    // ack ที่ยังส่งไม
 String        pendingAckStatus = "";
 long          recentCmdIds[4]  = {-1, -1, -1, -1};  // กันคำสั่งซ้ำ (QoS 1 ส่งซ้ำได้) — ปั๊มต้องไม่ทำงานสองรอบ
 int           recentCmdPos     = 0;
+
+// ===== 6b. Event log — ดูย้อนหลังได้ที่ http://plantpot.local/log โดยไม่ต้องต่อ USB =====
+const int EVLOG_SIZE = 30;
+String    evLogBuf[EVLOG_SIZE];
+int       evLogPos = 0;
+
+// พิมพ์ลง Serial + เก็บลง RAM (หายเมื่อรีเซ็ต — แต่หน้า /log บอกสาเหตุการรีเซ็ตครั้งล่าสุดไว้)
+void evlog(const char* fmt, ...) {
+  char buf[200];
+  va_list ap;
+  va_start(ap, fmt);
+  vsnprintf(buf, sizeof(buf), fmt, ap);
+  va_end(ap);
+  Serial.println(buf);
+  unsigned long t = millis() / 1000;
+  char stamp[24];
+  snprintf(stamp, sizeof(stamp), "[%02lu:%02lu:%02lu] ", t / 3600, (t / 60) % 60, t % 60);
+  evLogBuf[evLogPos] = String(stamp) + buf;
+  evLogPos = (evLogPos + 1) % EVLOG_SIZE;
+}
+
+const char* resetReasonText() {
+  switch (esp_reset_reason()) {
+    case ESP_RST_POWERON:  return "POWERON (เพิ่งเสียบไฟ)";
+    case ESP_RST_BROWNOUT: return "BROWNOUT (ไฟตก — ปั๊ม/รีเลย์ดึงไฟ?)";
+    case ESP_RST_SW:       return "SW (รีสตาร์ทจากโค้ด เช่น บันทึกค่าตั้ง)";
+    case ESP_RST_PANIC:    return "PANIC (โปรแกรมพัง)";
+    case ESP_RST_INT_WDT:
+    case ESP_RST_TASK_WDT:
+    case ESP_RST_WDT:      return "WATCHDOG (loop ค้างนานเกินไป)";
+    case ESP_RST_EXT:      return "EXT (กดปุ่ม EN/RST)";
+    default:               return "OTHER";
+  }
+}
 
 // ===== 7. NVS config helpers =====
 // คืน true ถ้ามีค่าครบพอใช้งาน (Wi-Fi + Device ID + Token)
@@ -198,7 +233,7 @@ void flushPendingAck() {
   if (pendingAckId < 0 || !mqtt.connected()) return;
   String body = String("{\"id\":") + pendingAckId + ",\"status\":\"" + pendingAckStatus + "\"}";
   if (mqtt.publish(topicAck.c_str(), body.c_str())) {
-    Serial.printf("[ack] id=%ld status=%s\n", pendingAckId, pendingAckStatus.c_str());
+    evlog("[ack] id=%ld status=%s", pendingAckId, pendingAckStatus.c_str());
     pendingAckId = -1;
   }
 }
@@ -212,21 +247,21 @@ void ackCommand(long id, const char* status) {
 
 bool mqttConnect() {
   String clientId = "plantpot-" + cfgDeviceId;
-  Serial.printf("[mqtt] connecting %s:%u ...\n", mqttHost.c_str(), mqttPort);
+  evlog("[mqtt] connecting %s:%u ...", mqttHost.c_str(), mqttPort);
   // Last Will: ถ้าบอร์ดหลุดโดยไม่บอกลา broker จะประกาศ "offline" แทน
   bool ok = mqtt.connect(clientId.c_str(), cfgDeviceId.c_str(), cfgToken.c_str(),
                          topicStatus.c_str(), 1, true, "offline");
   if (!ok) {
     int st = mqtt.state();
     mqttAuthFailed = (st == MQTT_CONNECT_BAD_CREDENTIALS || st == MQTT_CONNECT_UNAUTHORIZED);
-    Serial.printf("[mqtt] connect failed state=%d%s\n", st,
+    evlog("[mqtt] connect failed state=%d%s", st,
                   mqttAuthFailed ? " (token ไม่ถูกต้อง — rotate แล้วหรือยัง? ใส่ใหม่ที่ปุ่มตั้งค่าใหม่/BOOT ค้าง 3 วิ)" : "");
     return false;
   }
   mqttAuthFailed = false;
   mqtt.publish(topicStatus.c_str(), "online", true);
   mqtt.subscribe(topicCmd.c_str(), 1);   // backend ส่งคำสั่งที่ค้างระหว่างออฟไลน์ให้หลัง subscribe
-  Serial.println("[mqtt] connected");
+  evlog("[mqtt] connected (rssi=%d)", WiFi.RSSI());
   flushPendingAck();
   lastSensorPost = millis() - SENSOR_POST_MS;  // ส่งความชื้นทันทีที่ต่อได้
   return true;
@@ -236,7 +271,7 @@ void publishSensor() {
   int pct = readMoisturePercent();
   String body = String("{\"moisturePercent\":") + pct + "}";
   bool ok = mqtt.publish(topicSensor.c_str(), body.c_str());
-  Serial.printf("[sensor] publish %s  pct=%d\n", ok ? "ok" : "FAILED", pct);
+  evlog("[sensor] publish %s  pct=%d", ok ? "ok" : "FAILED", pct);
 }
 
 bool extractJsonInt(const String& s, const String& key, long* out) {
@@ -285,17 +320,17 @@ void onMqttMessage(char* topic, byte* payload, unsigned int len) {
   if (dur > 120) dur = 120;
 
   if (seenCommand(id)) {                  // QoS 1 ส่งซ้ำ — ทำไปแล้ว ไม่รดซ้ำ
-    Serial.printf("[cmd] duplicate id=%ld ignored\n", id);
+    evlog("[cmd] duplicate id=%ld ignored", id);
     return;
   }
   rememberCommand(id);
   if (isCloudActive) {                    // backend ส่งทีละคำสั่งอยู่แล้ว — ถ้ามาซ้อนแปลว่าสถานะไม่ตรงกัน
-    Serial.printf("[cmd] busy with id=%ld -> reject id=%ld\n", cloudCmdId, id);
+    evlog("[cmd] busy with id=%ld -> reject id=%ld", cloudCmdId, id);
     ackCommand(id, "failed");             // คืนแต้มทันที ดีกว่าให้ผู้ใช้รอ cleanup
     return;
   }
 
-  Serial.printf("[cmd] start id=%ld type=%s dur=%lds\n", id, type.c_str(), dur);
+  evlog("[cmd] start id=%ld type=%s dur=%lds", id, type.c_str(), dur);
   cloudCmdId      = id;
   cloudType       = type;
   cloudDurationMs = (unsigned long)dur * 1000;
@@ -466,7 +501,7 @@ void handleRoot() {
 
   html += "<div class=\"meta\">MQTT: " + htmlEscape(mqttHost) + ":" + String(mqttPort) +
           (mqtt.connected() ? " ✅ เชื่อมต่อแล้ว" : (mqttAuthFailed ? " ❌ Token ไม่ถูกต้อง" : " ⏳ กำลังเชื่อมต่อ")) +
-          " · Device: " + htmlEscape(cfgDeviceId) + "</div>";
+          " · Device: " + htmlEscape(cfgDeviceId) + " · <a href=\"/log\">ดู log</a></div>";
 
   html += "<script>";
   html += "setInterval(() => { fetch('/moisture').then(r=>r.text()).then(d=>document.getElementById('moistureValue').innerText=d); }, 3000);";
@@ -487,6 +522,24 @@ void handleFertilizer() {
     openFertilizerValve();
   }
   server.send(200, "text/plain", "OK");
+}
+
+// หน้าดูเหตุการณ์ย้อนหลัง — ใช้วิเคราะห์ตอนบอร์ดหลุดโดยไม่ต้องต่อ USB/Serial Monitor
+void handleLog() {
+  unsigned long t = millis() / 1000;
+  String out;
+  out.reserve(3000);
+  out += "Uptime: " + String(t / 3600) + "h " + String((t / 60) % 60) + "m " + String(t % 60) + "s  (เลขน้อย = เพิ่งรีเซ็ต)\n";
+  out += "Reset reason: " + String(resetReasonText()) + "\n";
+  out += "Wi-Fi: " + String(WiFi.status() == WL_CONNECTED ? "connected" : "DOWN") + "  rssi=" + String(WiFi.RSSI()) + " dBm\n";
+  out += "MQTT: " + String(mqtt.connected() ? "connected" : "DOWN") + "  state=" + String(mqtt.state()) +
+         "  " + mqttHost + ":" + String(mqttPort) + "\n";
+  out += "Free heap: " + String(ESP.getFreeHeap()) + " bytes\n\n--- เหตุการณ์ล่าสุด (ใหม่สุดอยู่บน) ---\n";
+  for (int i = 1; i <= EVLOG_SIZE; i++) {
+    const String& line = evLogBuf[(evLogPos - i + EVLOG_SIZE) % EVLOG_SIZE];
+    if (line.length()) out += line + "\n";
+  }
+  server.send(200, "text/plain; charset=utf-8", out);
 }
 
 // อัปเดตแค่ Server URL ลง NVS แบบไม่ล้างค่าอื่น — ใช้ตอน IP เครื่อง backend เปลี่ยน (เช่น Wi-Fi หอ)
@@ -524,6 +577,7 @@ void handleReset() {
 // ===== 12. Setup / Loop =====
 void setup() {
   Serial.begin(115200);
+  evlog("[boot] reset reason: %s", resetReasonText());
   pinMode(pumpPin,            OUTPUT);
   pinMode(valveWaterPin,      OUTPUT);
   pinMode(valveFertilizerPin, OUTPUT);
@@ -563,6 +617,7 @@ void setup() {
   server.on("/fertilizer", handleFertilizer);
   server.on("/setapi",     HTTP_POST, handleSetApi);
   server.on("/reset",      handleReset);
+  server.on("/log",        handleLog);
   server.begin();
 
 }
@@ -581,11 +636,19 @@ void loop() {
   // Wi-Fi หลุด (router รีบูต / ต่อไม่ติดตอน boot) — ลอง reconnect เป็นระยะ ไม่ค้าง offline — #1
   if (WiFi.status() != WL_CONNECTED && now - lastWifiTry >= WIFI_RETRY_MS) {
     lastWifiTry = now;
-    Serial.println("[wifi] disconnected -> reconnecting...");
+    evlog("[wifi] disconnected -> reconnecting...");
     WiFi.begin(cfgSsid.c_str(), cfgPass.c_str());
   }
 
   // mDNS: เข้าหน้าตั้งค่าที่ http://plantpot.local ได้โดยไม่ต้องรู้ IP ของบอร์ด (IP หอเปลี่ยนบ่อย)
+  static bool wifiWasUp = false;
+  bool wifiUp = WiFi.status() == WL_CONNECTED;
+  if (wifiUp != wifiWasUp) {
+    if (wifiUp) evlog("[wifi] connected ip=%s rssi=%d", WiFi.localIP().toString().c_str(), WiFi.RSSI());
+    else        evlog("[wifi] lost (status=%d)", WiFi.status());
+    wifiWasUp = wifiUp;
+  }
+
   if (WiFi.status() == WL_CONNECTED && !mdnsUp) {
     if (MDNS.begin("plantpot")) {
       MDNS.addService("http", "tcp", 80);
@@ -635,15 +698,15 @@ void loop() {
     } else if (!autoWaterActive && pct < AUTO_WATER_ON_PCT) {
       autoWaterActive = true;
       autoWaterStartedAt = now;
-      Serial.printf("[auto] start watering — pct=%d\n", pct);
+      evlog("[auto] start watering — pct=%d", pct);
     } else if (autoWaterActive) {
       if (pct > AUTO_WATER_OFF_PCT) {
         autoWaterActive = false;
-        Serial.printf("[auto] stop watering — recovered to pct=%d\n", pct);
+        evlog("[auto] stop watering — recovered to pct=%d", pct);
       } else if (now - autoWaterStartedAt > AUTO_WATER_MAX_MS) {
         autoWaterActive = false;
         autoWaterLocked = true;
-        Serial.printf("[auto] WARNING: max duration %lums hit at pct=%d — sensor may be faulty, locking out\n",
+        evlog("[auto] WARNING: max duration %lums hit at pct=%d — sensor may be faulty, locking out",
                       AUTO_WATER_MAX_MS, pct);
       }
     }
@@ -654,7 +717,7 @@ void loop() {
   // --- Cloud (MQTT) ---
   if (mqttWasUp && !mqtt.connected()) {
     // -4 = keepalive timeout (ไม่ได้คำตอบ ping) · -3 = connection ขาด (Wi-Fi/เน็ต/Funnel) · -1 = ถูกตัดจากฝั่ง broker
-    Serial.printf("[mqtt] lost connection state=%d wifi=%d rssi=%d\n", mqtt.state(), WiFi.status(), WiFi.RSSI());
+    evlog("[mqtt] lost connection state=%d wifi=%d rssi=%d", mqtt.state(), WiFi.status(), WiFi.RSSI());
   }
   mqttWasUp = mqtt.connected();
   if (WiFi.status() == WL_CONNECTED) {
