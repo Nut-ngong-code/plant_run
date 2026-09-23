@@ -50,6 +50,7 @@ broker.authenticate = async (client, username, password, done) => {
 
     const device = await prisma.device.findUnique({ where: { deviceId } });
     if (!device || !tokenMatches(device, token)) {
+      console.warn(`[mqtt] ${deviceId} ต่อไม่ผ่าน: ${device ? "token ไม่ตรง (rotate แล้วยังไม่ได้ใส่ token ใหม่?)" : "ไม่พบ Device ID นี้"}`);
       return done(authError(4, "Bad device credentials"), false);
     }
     client.plant = { id: device.id, deviceId: device.deviceId };
