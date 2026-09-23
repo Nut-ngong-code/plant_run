@@ -1,0 +1,129 @@
+
+<style>
+#erd { padding: 1rem 0; }
+#erd svg { width: 100%; }
+.legend { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; padding: 0 4px; }
+.legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--color-text-secondary); }
+.legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+</style>
+<div id="erd"></div>
+<div class="legend">
+  <div class="legend-item"><div class="legend-dot" style="background:#7F77DD"></div> ผู้ใช้และการวิ่ง</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#1D9E75"></div> อุปกรณ์ IoT</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#BA7517"></div> คำสั่งและประวัติ</div>
+</div>
+<script type="module">
+import mermaid from 'https://esm.sh/mermaid@11/dist/mermaid.esm.min.mjs';
+const dark = matchMedia('(prefers-color-scheme: dark)').matches;
+await document.fonts.ready;
+mermaid.initialize({
+  startOnLoad: false,
+  theme: 'base',
+  fontFamily: '"Anthropic Sans", sans-serif',
+  themeVariables: {
+    darkMode: dark,
+    fontSize: '13px',
+    fontFamily: '"Anthropic Sans", sans-serif',
+    lineColor: dark ? '#9c9a92' : '#73726c',
+    textColor: dark ? '#c2c0b6' : '#3d3d3a',
+    primaryColor: dark ? '#3C3489' : '#EEEDFE',
+    primaryTextColor: dark ? '#CECBF6' : '#3C3489',
+    primaryBorderColor: dark ? '#534AB7' : '#AFA9EC',
+    secondaryColor: dark ? '#085041' : '#E1F5EE',
+    secondaryTextColor: dark ? '#9FE1CB' : '#085041',
+    secondaryBorderColor: dark ? '#0F6E56' : '#5DCAA5',
+    tertiaryColor: dark ? '#633806' : '#FAEEDA',
+    tertiaryTextColor: dark ? '#FAC775' : '#633806',
+    tertiaryBorderColor: dark ? '#854F0B' : '#EF9F27',
+  },
+});
+const diagram = `erDiagram
+  USER {
+    int id PK
+    string strava_id UK
+    string display_name
+    string access_token
+    string refresh_token
+    datetime token_expires_at
+    int total_points
+    datetime created_at
+  }
+  DEVICE {
+    int id PK
+    int user_id FK
+    string device_id UK
+    string auth_token_hash
+    string display_name
+    boolean is_online
+    datetime last_seen_at
+    datetime created_at
+  }
+  RUN_HISTORY {
+    int id PK
+    int user_id FK
+    string strava_activity_id UK
+    float distance_km
+    int points_earned
+    datetime run_at
+    datetime synced_at
+  }
+  SOIL_LOG {
+    int id PK
+    int device_id FK
+    int moisture_percent
+    datetime recorded_at
+  }
+  ACTION_LOG {
+    int id PK
+    int user_id FK
+    int device_id FK
+    string action_type
+    string status
+    int points_deducted
+    int duration_seconds
+    datetime scheduled_at
+    datetime executed_at
+    datetime created_at
+  }
+  AUTO_SCHEDULE {
+    int id PK
+    int device_id FK
+    string action_type
+    string cron_expression
+    int duration_seconds
+    boolean is_active
+    datetime created_at
+  }
+  USER ||--o{ DEVICE : "เป็นเจ้าของ"
+  USER ||--o{ RUN_HISTORY : "มีประวัติวิ่ง"
+  USER ||--o{ ACTION_LOG : "สั่งงาน"
+  DEVICE ||--o{ SOIL_LOG : "บันทึกความชื้น"
+  DEVICE ||--o{ ACTION_LOG : "รับคำสั่ง"
+  DEVICE ||--o{ AUTO_SCHEDULE : "ตั้งเวลาอัตโนมัติ"
+`;
+const { svg } = await mermaid.render('erd-svg', diagram);
+document.getElementById('erd').innerHTML = svg;
+
+document.querySelectorAll('#erd svg.erDiagram .node').forEach(node => {
+  const firstPath = node.querySelector('path[d]');
+  if (!firstPath) return;
+  const d = firstPath.getAttribute('d');
+  const nums = d.match(/-?[\d.]+/g)?.map(Number);
+  if (!nums || nums.length < 8) return;
+  const xs = [nums[0], nums[2], nums[4], nums[6]];
+  const ys = [nums[1], nums[3], nums[5], nums[7]];
+  const x = Math.min(...xs), y = Math.min(...ys);
+  const w = Math.max(...xs) - x, h = Math.max(...ys) - y;
+  const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+  rect.setAttribute('x', x); rect.setAttribute('y', y);
+  rect.setAttribute('width', w); rect.setAttribute('height', h);
+  rect.setAttribute('rx', '8');
+  for (const a of ['fill', 'stroke', 'stroke-width', 'class', 'style']) {
+    if (firstPath.hasAttribute(a)) rect.setAttribute(a, firstPath.getAttribute(a));
+  }
+  firstPath.replaceWith(rect);
+});
+document.querySelectorAll('#erd svg.erDiagram .row-rect-odd path, #erd svg.erDiagram .row-rect-even path').forEach(p => {
+  p.setAttribute('stroke', 'none');
+});
+</script>

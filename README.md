@@ -59,5 +59,5 @@ cd frontend && pnpm install && pnpm run dev
 
 - `../แผนการทำงาน.pdf` — แผน 6 เฟส (source of truth)
 - `../ขอบเขตงานวิ่งเพื่อรดน้ำ.pdf` — scope document
-- `../db_schema_plant_watering.html` — ER diagram (Mermaid)
+- `database/db_schema_plant_watering.html` — ER diagram (Mermaid)
 - `../CLAUDE.md` — instructions สำหรับ AI assistant + dev notes
