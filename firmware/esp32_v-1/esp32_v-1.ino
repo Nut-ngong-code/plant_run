@@ -76,6 +76,7 @@ unsigned long lastSensorPost  = 0;
 unsigned long lastWifiTry     = 0;
 unsigned long lastMqttTry     = 0;
 bool          mqttAuthFailed  = false;  // ครั้งล่าสุดต่อไม่ติดเพราะ token ผิด
+bool          mqttWasUp       = false;  // ใช้ log ตอนหลุด พร้อมสาเหตุ
 
 long          pendingAckId     = -1;    // ack ที่ยังส่งไม่ออก (MQTT หลุดตอนทำเสร็จ) — ส่งซ้ำตอนต่อกลับ
 String        pendingAckStatus = "";
@@ -651,6 +652,11 @@ void loop() {
   }
 
   // --- Cloud (MQTT) ---
+  if (mqttWasUp && !mqtt.connected()) {
+    // -4 = keepalive timeout (ไม่ได้คำตอบ ping) · -3 = connection ขาด (Wi-Fi/เน็ต/Funnel) · -1 = ถูกตัดจากฝั่ง broker
+    Serial.printf("[mqtt] lost connection state=%d wifi=%d rssi=%d\n", mqtt.state(), WiFi.status(), WiFi.RSSI());
+  }
+  mqttWasUp = mqtt.connected();
   if (WiFi.status() == WL_CONNECTED) {
     if (mqtt.connected()) {
       mqtt.loop();   // รับคำสั่ง + ส่ง keepalive ping (heartbeat)

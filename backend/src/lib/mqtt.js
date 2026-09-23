@@ -19,7 +19,13 @@ import { tokenMatches } from "../middleware/deviceAuth.js";
 // ยืนยันตัวตน: username = deviceId, password = device token — ตรวจกับ hash ใน DB ตัวเดียวกับ HTTP Bearer
 // ฐานข้อมูล (ACTION_LOG) ยังเป็นคิวคำสั่งตัวจริง — broker แค่ส่งต่อ ไม่ได้เก็บคำสั่งไว้เอง
 
-const topicOf = (deviceId, leaf) => `plant/${deviceId}/${leaf}`;
+// MySQL เทียบ device_id แบบไม่สนตัวพิมพ์ (login ด้วย "pot-001" ผ่านได้ ถ้าใน DB เป็น "POT-001")
+// topic ก็ต้องเทียบแบบเดียวกัน ไม่งั้นบอร์ดโดนตัดทันทีที่ publish ครั้งแรก
+const sameId = (a, b) => typeof a === "string" && typeof b === "string" && a.toLowerCase() === b.toLowerCase();
+const isOwnCmd = (client, topic) => {
+  const [root, deviceId, leaf, ...rest] = topic.split("/");
+  return root === "plant" && sameId(deviceId, client.plant?.deviceId) && leaf === "cmd" && rest.length === 0;
+};
 const DEVICE_PUBLISH_LEAVES = new Set(["ack", "sensor", "status"]);
 const ONLINE_THRESHOLD_MS = 60_000;
 
@@ -58,14 +64,16 @@ broker.authenticate = async (client, username, password, done) => {
 broker.authorizePublish = (client, packet, cb) => {
   if (!client) return cb(null); // Last Will ของ client ที่ยืนยันตัวตนไปแล้ว
   const [root, deviceId, leaf, ...rest] = packet.topic.split("/");
-  const own = root === "plant" && deviceId === client.plant?.deviceId && rest.length === 0;
+  const own = root === "plant" && sameId(deviceId, client.plant?.deviceId) && rest.length === 0;
   if (own && DEVICE_PUBLISH_LEAVES.has(leaf)) return cb(null);
+  console.warn(`[mqtt] ${client.plant?.deviceId} ถูกปฏิเสธ publish ${packet.topic} → ตัดการเชื่อมต่อ`);
   cb(new Error(`not allowed to publish ${packet.topic}`));
 };
 
 // subscribe ได้เฉพาะคิวคำสั่งของตัวเอง — topic อื่นตอบ SUBACK failure แต่ไม่ตัดการเชื่อมต่อ
 broker.authorizeSubscribe = (client, sub, cb) => {
-  if (client.plant && sub.topic === topicOf(client.plant.deviceId, "cmd")) return cb(null, sub);
+  if (client.plant && isOwnCmd(client, sub.topic)) return cb(null, sub);
+  console.warn(`[mqtt] ${client.plant?.deviceId} ถูกปฏิเสธ subscribe ${sub.topic}`);
   cb(null, null);
 };
 
@@ -84,8 +92,10 @@ broker.on("clientReady", (client) => {
 // ข้อความจะไม่มีใครรับ (clean session) แล้วคำสั่งค้าง executing จน cleanup คืนแต้ม
 broker.on("subscribe", (subs, client) => {
   const dev = client.plant;
-  if (!dev || !subs.some((s) => s.topic === topicOf(dev.deviceId, "cmd") && s.qos !== 128)) return;
+  const cmd = subs.find((s) => isOwnCmd(client, s.topic) && s.qos !== 128);
+  if (!dev || !cmd) return;
   client.plantReady = true;
+  client.plantCmdTopic = cmd.topic; // ใช้ตัวสะกดเดียวกับที่บอร์ด subscribe ไว้ ไม่งั้นข้อความไม่ถึง
   dispatchNext(dev.id); // ส่งคำสั่งที่ค้างระหว่างออฟไลน์
 });
 
@@ -94,7 +104,15 @@ broker.on("clientDisconnect", (client) => {
   if (!dev || connected.get(dev.id) !== client) return;
   connected.delete(dev.id);
   disconnectedAt.set(dev.id, Date.now());
-  console.log(`[mqtt] ${dev.deviceId} disconnected`);
+  console.log(`[mqtt] ${dev.deviceId} disconnected (${client.plantLostReason ?? "connection ปิดจากฝั่งบอร์ดหรือเครือข่าย"})`);
+});
+
+// เหตุผลที่หลุด — log ไว้ใน clientDisconnect บรรทัดเดียวกัน
+broker.on("keepaliveTimeout", (client) => {
+  client.plantLostReason = `keepalive timeout — ไม่ได้ยิน ping เกิน ${1.5 * (client.keepalive || 0)} วิ`;
+});
+broker.on("clientError", (client, err) => {
+  client.plantLostReason = err?.message ?? "client error";
 });
 
 // keepalive ping = heartbeat → อัปเดต lastSeenAt เหมือนที่ requireDeviceAuth ทำกับ HTTP
@@ -193,7 +211,7 @@ async function dispatchOnce(deviceDbId) {
   if (claimed.count === 0) return;
 
   await publish(
-    topicOf(client.plant.deviceId, "cmd"),
+    client.plantCmdTopic,
     { id: next.id, type: next.actionType, durationSeconds: next.durationSeconds },
     1,
   );
