@@ -6,6 +6,8 @@
 #include <DNSServer.h>     // captive portal — ดึงหน้าตั้งค่าให้เด้งเอง
 #include <ESPmDNS.h>       // เข้าหน้าตั้งค่าที่ http://plantpot.local โดยไม่ต้องรู้ IP ของบอร์ด
 #include <esp_system.h>    // esp_reset_reason() — บอร์ดรีเซ็ตเพราะอะไร (ไฟตก/watchdog/...)
+#include <ArduinoOTA.h>    // อัปเดต firmware ผ่าน Wi-Fi จาก Arduino IDE (พอร์ตเครือข่าย "plantpot")
+#include <Update.h>        // อัปเดต firmware ด้วยไฟล์ .bin ผ่านหน้าเว็บ /update
 
 // ============================================================================
 //  วิ่งเพื่อชีวิตของต้นไม้ในกระถาง — ESP32 firmware (MQTT)
@@ -501,7 +503,7 @@ void handleRoot() {
 
   html += "<div class=\"meta\">MQTT: " + htmlEscape(mqttHost) + ":" + String(mqttPort) +
           (mqtt.connected() ? " ✅ เชื่อมต่อแล้ว" : (mqttAuthFailed ? " ❌ Token ไม่ถูกต้อง" : " ⏳ กำลังเชื่อมต่อ")) +
-          " · Device: " + htmlEscape(cfgDeviceId) + " · <a href=\"/log\">ดู log</a></div>";
+          " · Device: " + htmlEscape(cfgDeviceId) + " · <a href=\"/log\">ดู log</a> · <a href=\"/update\">อัปเดต firmware</a></div>";
 
   html += "<script>";
   html += "setInterval(() => { fetch('/moisture').then(r=>r.text()).then(d=>document.getElementById('moistureValue').innerText=d); }, 3000);";
@@ -574,6 +576,87 @@ void handleReset() {
   ESP.restart();
 }
 
+// ===== 11b. OTA — อัปเดต firmware ผ่าน Wi-Fi ไม่ต้องเสียบ USB =====
+// รหัสผ่าน = Device Token (rotate token บนเว็บ → รหัส OTA เปลี่ยนตามอัตโนมัติ หลังใส่ token ใหม่ในบอร์ด)
+// ช่องทาง A: Arduino IDE → Tools → Port → "plantpot at 192.168.x.x" → Upload (ถามรหัส = token)
+// ช่องทาง B: Sketch → Export Compiled Binary → เปิด http://plantpot.local/update (user: plantpot / รหัส: token)
+// ต้องอยู่ Wi-Fi วงเดียวกับบอร์ด · ถ้า flash ไม่ครบ บอร์ดบูต firmware เดิมต่อ (เขียนลงอีก partition)
+const char* OTA_USER = "plantpot";
+bool        otaStarted  = false;
+bool        webOtaAuthed = false;
+
+// หยุดทุกอย่างที่เปิดน้ำอยู่ก่อนเริ่มเขียนแฟลช — ระหว่างอัปโหลด loop ถูกบล็อก ปั๊มจะค้างสถานะเดิม
+// คำสั่งจากเว็บที่ค้างอยู่จะไม่มี ack → backend คืนแต้มเองหลัง 180 วิ (cleanup job)
+void prepareForOta() {
+  closeAll();
+  isCloudActive   = false;
+  isFertilizing   = false;
+  isManualWater   = false;
+  autoWaterActive = false;
+  if (mqtt.connected()) mqtt.disconnect();
+}
+
+void startArduinoOta() {
+  ArduinoOTA.setHostname("plantpot");
+  ArduinoOTA.setPassword(cfgToken.c_str());
+  ArduinoOTA.setMdnsEnabled(false);   // ประกาศ mDNS เองใน loop (MDNS.enableArduino) กันชนกับ plantpot.local
+  ArduinoOTA.onStart([]() {
+    prepareForOta();
+    evlog("[ota] IDE upload start");
+  });
+  ArduinoOTA.onEnd([]() { evlog("[ota] IDE upload done -> restart"); });
+  ArduinoOTA.onError([](ota_error_t e) { evlog("[ota] IDE upload error=%u", (unsigned)e); });
+  ArduinoOTA.begin();
+  otaStarted = true;
+  evlog("[ota] ready (Arduino IDE port: plantpot)");
+}
+
+void handleUpdatePage() {
+  if (!server.authenticate(OTA_USER, cfgToken.c_str())) return server.requestAuthentication();
+  server.send(200, "text/html; charset=utf-8",
+    "<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
+    "<style>body{font-family:sans-serif;background:#eef2f1;padding:18px;color:#234}.card{max-width:420px;margin:0 auto;background:#fff;padding:22px;border-radius:14px}"
+    "input{width:100%;margin:14px 0;font-size:15px}button{width:100%;padding:13px;border:0;border-radius:9px;background:#15a05a;color:#fff;font-size:16px;font-weight:700}"
+    ".hint{font-size:13px;color:#678}</style></head><body><div class=\"card\"><h2>⬆️ อัปเดต firmware</h2>"
+    "<p class=\"hint\">Arduino IDE → Sketch → Export Compiled Binary → เลือกไฟล์ <b>esp32_v-1.ino.bin</b><br>ระหว่างอัปเดตปั๊มและวาล์วจะถูกปิด · เสร็จแล้วบอร์ดรีสตาร์ทเอง</p>"
+    "<form method=\"POST\" action=\"/update\" enctype=\"multipart/form-data\" onsubmit=\"this.querySelector('button').innerText='กำลังอัปโหลด… อย่าปิดหน้านี้'\">"
+    "<input type=\"file\" name=\"firmware\" accept=\".bin\" required><button type=\"submit\">อัปโหลดและติดตั้ง</button></form>"
+    "<p class=\"hint\"><a href=\"/\">← กลับ</a></p></div></body></html>");
+}
+
+// รับไฟล์ทีละก้อนแล้วเขียนลงแฟลชเลย (ไม่เก็บทั้งไฟล์ใน RAM)
+void handleUpdateUpload() {
+  HTTPUpload& up = server.upload();
+  if (up.status == UPLOAD_FILE_START) {
+    webOtaAuthed = server.authenticate(OTA_USER, cfgToken.c_str());
+    if (!webOtaAuthed) return;
+    prepareForOta();
+    evlog("[ota] web upload start: %s", up.filename.c_str());
+    if (!Update.begin(UPDATE_SIZE_UNKNOWN)) evlog("[ota] begin failed: %s", Update.errorString());
+  } else if (!webOtaAuthed) {
+    return;
+  } else if (up.status == UPLOAD_FILE_WRITE) {
+    if (Update.write(up.buf, up.currentSize) != up.currentSize) evlog("[ota] write failed: %s", Update.errorString());
+  } else if (up.status == UPLOAD_FILE_END) {
+    if (Update.end(true)) evlog("[ota] web upload ok (%u bytes)", (unsigned)up.totalSize);
+    else                  evlog("[ota] web upload failed: %s", Update.errorString());
+  } else if (up.status == UPLOAD_FILE_ABORTED) {
+    Update.abort();
+    evlog("[ota] web upload aborted");
+  }
+}
+
+void handleUpdateDone() {
+  if (!webOtaAuthed) return server.requestAuthentication();
+  bool ok = !Update.hasError() && Update.isFinished();
+  server.send(ok ? 200 : 500, "text/html; charset=utf-8",
+    String("<meta charset=\"UTF-8\"><body style=\"font-family:sans-serif;text-align:center;padding:40px\">") +
+    (ok ? "<h2>✓ อัปเดตสำเร็จ</h2><p>บอร์ดกำลังรีสตาร์ท… รอราว 20 วิแล้วเปิด <a href=\"/log\">/log</a> ดูได้</p>"
+        : String("<h2>✗ อัปเดตไม่สำเร็จ</h2><p>") + Update.errorString() + "</p><p>บอร์ดยังใช้ firmware เดิม</p><a href=\"/update\">ลองใหม่</a>") +
+    "</body>");
+  if (ok) { delay(1000); ESP.restart(); }
+}
+
 // ===== 12. Setup / Loop =====
 void setup() {
   Serial.begin(115200);
@@ -618,6 +701,8 @@ void setup() {
   server.on("/setapi",     HTTP_POST, handleSetApi);
   server.on("/reset",      handleReset);
   server.on("/log",        handleLog);
+  server.on("/update",     HTTP_GET,  handleUpdatePage);
+  server.on("/update",     HTTP_POST, handleUpdateDone, handleUpdateUpload);
   server.begin();
 
 }
@@ -631,6 +716,7 @@ void loop() {
   }
 
   server.handleClient();
+  if (otaStarted) ArduinoOTA.handle();
   unsigned long now = millis();
 
   // Wi-Fi หลุด (router รีบูต / ต่อไม่ติดตอน boot) — ลอง reconnect เป็นระยะ ไม่ค้าง offline — #1
@@ -645,6 +731,7 @@ void loop() {
   bool wifiUp = WiFi.status() == WL_CONNECTED;
   if (wifiUp != wifiWasUp) {
     if (wifiUp) evlog("[wifi] connected ip=%s rssi=%d", WiFi.localIP().toString().c_str(), WiFi.RSSI());
+    if (wifiUp && !otaStarted) startArduinoOta();
     else        evlog("[wifi] lost (status=%d)", WiFi.status());
     wifiWasUp = wifiUp;
   }
@@ -652,6 +739,7 @@ void loop() {
   if (WiFi.status() == WL_CONNECTED && !mdnsUp) {
     if (MDNS.begin("plantpot")) {
       MDNS.addService("http", "tcp", 80);
+      MDNS.enableArduino(3232, true);   // ให้ Arduino IDE เห็นพอร์ตเครือข่าย "plantpot" (ต้องใส่รหัส)
       Serial.println("[mdns] http://plantpot.local ready");
     }
     mdnsUp = true;

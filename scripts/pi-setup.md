@@ -377,6 +377,8 @@ plantpi.tail1234.ts.net
 4. บันทึก → ESP32 รีบูต → ดู Serial Monitor ต้องเห็น `[mqtt] connected` ตามด้วย `[sensor] publish ok`
    (ถ้าเห็น `connect failed state=4` = token ผิด · `state=-2` = ต่อพอร์ต 8443 ไม่ได้ → เช็ค `tailscale funnel status`)
 
+> **ครั้งต่อไปไม่ต้องเสียบ USB** — firmware รองรับ OTA แล้ว (รหัส = Device Token): Arduino IDE เลือก Port `plantpot at 192.168.x.x` แล้ว Upload ได้เลย หรือ Export Compiled Binary แล้วอัปโหลดที่ `http://plantpot.local/update` · ต้องอยู่ Wi-Fi วงเดียวกับบอร์ด
+
 > **มี MQTT แล้วยังรับ firmware รุ่นเดิมได้** — ถ้า MQTT มีปัญหา flash `firmware/esp32_polling/` กลับได้ทันที backend ยังรองรับ HTTP polling ครบ
 
 หลังจากนี้ย้ายไปต่อ Wi-Fi ที่ไหนก็แค่กด BOOT ค้าง 3 วิ กรอก Wi-Fi ใหม่ **ส่วน Server URL ไม่ต้องแตะอีกเลย**
