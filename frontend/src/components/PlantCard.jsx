@@ -97,24 +97,6 @@ export function PlantCard({ device, totalPoints, onAction, onDelete, lastSyncedA
         <div className="flex items-center gap-1 shrink-0">
           <button
             type="button"
-            onClick={() => setMode("board")}
-            title="Open the pot's own web page (settings / log)"
-            className="h-7 w-7 rounded-full flex items-center justify-center text-forest-500 hover:text-forest-800 hover:bg-white/60 transition"
-            aria-label="open board page"
-          >
-            <BoardIcon />
-          </button>
-          <button
-            type="button"
-            onClick={() => setMode("confirmRotate")}
-            title="Rotate device token"
-            className="h-7 w-7 rounded-full flex items-center justify-center text-forest-500 hover:text-forest-800 hover:bg-white/60 transition"
-            aria-label="rotate token"
-          >
-            <KeyIcon />
-          </button>
-          <button
-            type="button"
             onClick={() => setMode("confirmDelete")}
             title="Remove this pot"
             className="h-7 w-7 rounded-full flex items-center justify-center text-forest-500 hover:text-rose-600 hover:bg-rose-50 transition"
@@ -183,9 +165,21 @@ export function PlantCard({ device, totalPoints, onAction, onDelete, lastSyncedA
         />
       </div>
 
+      <div className="grid grid-cols-2 gap-2.5">
+        <button type="button" onClick={() => setMode("board")} className="btn-outline flex items-center justify-center gap-1.5 text-xs">
+          <BoardIcon /> ตั้งค่ากระถาง
+        </button>
+        <button type="button" onClick={() => setMode("confirmRotate")} className="btn-outline flex items-center justify-center gap-1.5 text-xs">
+          <KeyIcon /> ขอ Token ใหม่
+        </button>
+      </div>
+
       {!device.isOnline && (
-        <div className="text-[11px] text-rose-700 bg-rose-50/80 border border-rose-200 rounded-lg px-3 py-2 text-center font-mono tracking-wide">
-          DEVICE OFFLINE — RECONNECT ESP32 TO SEND COMMANDS
+        <div className="text-[11px] text-rose-700 bg-rose-50/80 border border-rose-200 rounded-lg px-3 py-2 text-center leading-relaxed">
+          <div className="font-mono tracking-wide">DEVICE OFFLINE — RECONNECT ESP32 TO SEND COMMANDS</div>
+          <div className="text-forest-600 mt-1">
+            เพิ่งขอ Token ใหม่หรือย้าย Wi-Fi? กด <b>ตั้งค่ากระถาง</b> เพื่อวาง Token ใหม่ / ดู Log
+          </div>
         </div>
       )}
 
@@ -250,7 +244,7 @@ function CardOverlay({ mode, deviceId, localIp, token, copied, onRotateConfirm, 
     <div className="absolute inset-0 z-10 rounded-3xl bg-white/85 backdrop-blur-md flex flex-col p-5 gap-4 overflow-y-auto animate-fade-up">
       {mode === "board" && (
         <>
-          <div className="label-eyebrow text-sky2-600">📡 หน้าเว็บของกระถาง</div>
+          <div className="label-eyebrow text-sky2-600">⚙️ ตั้งค่ากระถาง — หน้าเว็บบนตัวบอร์ด</div>
           {ipUrl ? (
             <div className="grid grid-cols-2 gap-1 rounded-xl bg-white/50 border border-forest-200 p-1 text-[11px] font-mono">
               <button
@@ -273,7 +267,7 @@ function CardOverlay({ mode, deviceId, localIp, token, copied, onRotateConfirm, 
           )}
           <div className="flex flex-col gap-2">
             <a href={boardUrl} target="_blank" rel="noreferrer" className="btn-outline block w-full text-center">
-              ตั้งค่า / ควบคุม
+              เปลี่ยน Token · Server URL · ตั้งค่า Wi-Fi ใหม่
             </a>
             <a href={`${boardUrl}/log`} target="_blank" rel="noreferrer" className="btn-outline block w-full text-center">
               ดู LOG
@@ -298,7 +292,7 @@ function CardOverlay({ mode, deviceId, localIp, token, copied, onRotateConfirm, 
             ออก token ใหม่ — token เก่าใช้ไม่ได้ทันที
             <br />
             <span className="text-forest-500 text-xs">
-              นำ token ใหม่ไปวางในช่อง “เปลี่ยน Token” บนหน้าเว็บของบอร์ด ({boardUrl}) — ไม่ต้องตั้ง Wi-Fi ใหม่ ไม่ต้อง flash
+              ขั้นต่อไป: คัดลอก token ใหม่ → กด “ตั้งค่ากระถาง” (หรือลิงก์ที่จะขึ้นถัดไป) → วางในช่อง “🔑 เปลี่ยน Token” → บันทึก — ไม่ต้องตั้ง Wi-Fi ใหม่ ไม่ต้อง flash
             </span>
           </p>
           <div className="mt-auto flex gap-2">
@@ -326,12 +320,12 @@ function CardOverlay({ mode, deviceId, localIp, token, copied, onRotateConfirm, 
           >
             {copied ? "✓ COPIED" : "COPY TOKEN"}
           </button>
+          <a href={boardUrl} target="_blank" rel="noreferrer" className="btn-outline block w-full text-center text-sky2-600">
+            ⚙️ เปิดหน้าตั้งค่ากระถาง → วาง Token
+          </a>
           <p className="text-[11px] text-forest-500 leading-snug">
-            วางที่{" "}
-            <a href={boardUrl} target="_blank" rel="noreferrer" className="font-mono text-sky2-600 underline">
-              {boardUrl}
-            </a>{" "}
-            → ช่อง “เปลี่ยน Token” (ต้องอยู่ Wi-Fi เดียวกับกระถาง)
+            วางในช่อง “🔑 เปลี่ยน Token” แล้วกดบันทึก · ต้องอยู่ Wi-Fi เดียวกับกระถาง ·{" "}
+            <span className="font-mono">{boardUrl}</span>
           </p>
           <button onClick={onDismiss} className="btn-primary w-full mt-auto">
             I&apos;VE SAVED IT
