@@ -145,6 +145,7 @@ export function PlantCard({ device, totalPoints, onAction, onDelete, lastSyncedA
         <CardOverlay
           mode={mode}
           deviceId={device.deviceId}
+          localIp={device.localIp}
           token={issuedToken}
           copied={copied}
           onRotateConfirm={confirmRotate}
@@ -237,14 +238,39 @@ function boardHost(deviceId = "") {
   return ("plantpot-" + deviceId.toLowerCase().replace(/[^a-z0-9]/g, "-")).slice(0, 40);
 }
 
-function CardOverlay({ mode, deviceId, token, copied, onRotateConfirm, onDeleteConfirm, onCopy, onDismiss }) {
-  const boardUrl = `http://${boardHost(deviceId)}.local`;
+const IS_ANDROID = typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent);
+
+function CardOverlay({ mode, deviceId, localIp, token, copied, onRotateConfirm, onDeleteConfirm, onCopy, onDismiss }) {
+  const hostUrl = `http://${boardHost(deviceId)}.local`;
+  const ipUrl = localIp ? `http://${localIp}` : null;
+  // Android หลายรุ่น resolve ชื่อ .local ไม่ได้ → ถ้ารู้ IP ให้เริ่มที่ IP เลย
+  const [useIp, setUseIp] = useState(IS_ANDROID && !!ipUrl);
+  const boardUrl = useIp && ipUrl ? ipUrl : hostUrl;
   return (
-    <div className="absolute inset-0 z-10 rounded-3xl bg-white/85 backdrop-blur-md flex flex-col p-5 gap-4 animate-fade-up">
+    <div className="absolute inset-0 z-10 rounded-3xl bg-white/85 backdrop-blur-md flex flex-col p-5 gap-4 overflow-y-auto animate-fade-up">
       {mode === "board" && (
         <>
           <div className="label-eyebrow text-sky2-600">📡 หน้าเว็บของกระถาง</div>
-          <div className="font-mono text-[11px] text-forest-600 break-all">{boardUrl}</div>
+          {ipUrl ? (
+            <div className="grid grid-cols-2 gap-1 rounded-xl bg-white/50 border border-forest-200 p-1 text-[11px] font-mono">
+              <button
+                type="button"
+                onClick={() => setUseIp(false)}
+                className={`rounded-lg px-2 py-1.5 truncate ${!useIp ? "bg-white text-forest-900 shadow-sm" : "text-forest-500"}`}
+              >
+                {boardHost(deviceId)}.local
+              </button>
+              <button
+                type="button"
+                onClick={() => setUseIp(true)}
+                className={`rounded-lg px-2 py-1.5 truncate ${useIp ? "bg-white text-forest-900 shadow-sm" : "text-forest-500"}`}
+              >
+                IP {localIp}
+              </button>
+            </div>
+          ) : (
+            <div className="font-mono text-[11px] text-forest-600 break-all">{boardUrl}</div>
+          )}
           <div className="flex flex-col gap-2">
             <a href={boardUrl} target="_blank" rel="noreferrer" className="btn-outline block w-full text-center">
               ตั้งค่า / ควบคุม
@@ -257,8 +283,10 @@ function CardOverlay({ mode, deviceId, token, copied, onRotateConfirm, onDeleteC
             </a>
           </div>
           <p className="text-[11px] text-forest-500 leading-snug">
-            ต้องใช้อุปกรณ์ที่อยู่ Wi-Fi เดียวกับกระถาง · เปิดได้แม้การ์ดขึ้น OFFLINE (เช่น Token ไม่ถูกต้อง) ·
-            ถ้าเปิดชื่อนี้ไม่ขึ้น (มือถือ Android บางรุ่น) ให้ใช้ IP ของบอร์ดจากหน้าเราเตอร์แทน
+            ต้องใช้อุปกรณ์ที่อยู่ Wi-Fi เดียวกับกระถาง · เปิดได้แม้การ์ดขึ้น OFFLINE (เช่น Token ไม่ถูกต้อง) ·{" "}
+            {ipUrl
+              ? "ถ้าเปิดชื่อ .local ไม่ขึ้น (มือถือ Android บางรุ่น) ให้เลือก IP — IP อาจเปลี่ยนได้ ถ้าเปิดไม่ขึ้นทั้งคู่ลองรอให้กระถางกลับมา LIVE"
+              : "ถ้าเปิดชื่อนี้ไม่ขึ้น (มือถือ Android บางรุ่น) ให้ใช้ IP ของบอร์ดจากหน้าเราเตอร์แทน — ปุ่ม IP จะขึ้นเองหลังกระถางต่อเข้ามาด้วย firmware รุ่นใหม่"}
           </p>
           <button onClick={onDismiss} className="btn-primary w-full mt-auto">CLOSE</button>
         </>

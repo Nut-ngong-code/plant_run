@@ -2,7 +2,7 @@ import { Router } from "express";
 
 import { prisma } from "../lib/prisma.js";
 import { HttpError } from "../middleware/error.js";
-import { isDeviceOnline } from "../lib/mqtt.js";
+import { isDeviceOnline, getLocalIp } from "../lib/mqtt.js";
 
 export const userRouter = Router();
 
@@ -67,6 +67,7 @@ userRouter.get("/:id/dashboard", async (req, res) => {
       displayName: d.displayName,
       isOnline: isDeviceOnline(d, nowMs),
       lastSeenAt: d.lastSeenAt,
+      localIp: getLocalIp(d.id),
       latestMoisture: d.soilLogs[0] ?? null,
     })),
     weekly: {

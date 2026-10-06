@@ -33,6 +33,7 @@ const broker = Aedes();
 const connected = new Map(); // DEVICE.id → client ที่ต่ออยู่
 const disconnectedAt = new Map(); // DEVICE.id → เวลาที่หลุดล่าสุด (ตัดเป็น offline ทันทีไม่ต้องรอ 60 วิ)
 const dispatchChains = new Map(); // DEVICE.id → promise chain (ส่งคำสั่งของกระถางเดียวกันทีละตัว)
+const localIps = new Map(); // DEVICE.id → IP ในวง LAN ที่บอร์ดแจ้งมากับค่าความชื้น (ลิงก์สำรองไปหน้าเว็บบอร์ด)
 
 const logErr = (where) => (err) => console.error(`[mqtt] ${where}:`, err?.message ?? err);
 
@@ -130,7 +131,16 @@ broker.on("publish", (packet, client) => {
   handleDevicePublish(client.plant, packet).catch(logErr(packet.topic));
 });
 
-const sensorMsg = z.object({ moisturePercent: z.number().int().min(0).max(100) });
+const sensorMsg = z.object({
+  moisturePercent: z.number().int().min(0).max(100),
+  ip: z.unknown().optional(), // firmware รุ่นก่อน 2026-10-07 ไม่ส่งมา · ผิดรูปแบบก็ยังเก็บค่าความชื้น
+});
+
+// รับเฉพาะ IP วงส่วนตัว — ค่านี้กลายเป็นลิงก์บนหน้าเว็บ ไม่ให้บอร์ดชี้ผู้ใช้ไปที่อื่น
+const isPrivateIpv4 = (ip) =>
+  typeof ip === "string" &&
+  net.isIPv4(ip) &&
+  (/^10\./.test(ip) || /^192\.168\./.test(ip) || /^172\.(1[6-9]|2\d|3[01])\./.test(ip));
 const ackMsg = z.object({
   id: z.number().int().positive(),
   status: z.enum(["success", "failed"]),
@@ -150,6 +160,7 @@ async function handleDevicePublish(dev, packet) {
   if (leaf === "sensor") {
     const parsed = sensorMsg.safeParse(body);
     if (!parsed.success) return console.warn(`[mqtt] ${packet.topic}: payload ไม่ถูกต้อง`);
+    if (isPrivateIpv4(parsed.data.ip)) localIps.set(dev.id, parsed.data.ip);
     await prisma.soilLog.create({
       data: { deviceId: dev.id, moisturePercent: parsed.data.moisturePercent },
     });
@@ -225,6 +236,12 @@ export function isDeviceOnline(device, now = Date.now()) {
   const lastSeen = device.lastSeenAt ? new Date(device.lastSeenAt).getTime() : 0;
   if ((disconnectedAt.get(device.id) ?? 0) >= lastSeen) return false; // หลุดจาก MQTT หลังสัญญาณล่าสุด
   return now - lastSeen < ONLINE_THRESHOLD_MS;
+}
+
+// IP ล่าสุดที่บอร์ดแจ้ง (เก็บใน memory — หลัง restart backend จะว่างจนบอร์ดส่งค่าความชื้นครั้งถัดไป
+// ซึ่งส่งทันทีที่ต่อ MQTT ได้) · คงค่าไว้แม้บอร์ดหลุด เพราะตอนหลุดคือตอนที่ต้องเข้าไปดูหน้าเว็บบอร์ด
+export function getLocalIp(deviceDbId) {
+  return localIps.get(deviceDbId) ?? null;
 }
 
 // ตัดการเชื่อมต่อทันทีเมื่อ rotate token / ลบกระถาง — ไม่งั้น connection เดิมยังใช้ token เก่าได้ต่อ

@@ -404,7 +404,8 @@ bool mqttConnect()
 void publishSensor()
 {
   int pct = readMoisturePercent();
-  String body = String("{\"moisturePercent\":") + pct + "}";
+  // ip = ที่อยู่ในวง LAN → เว็บหลักใช้ทำลิงก์สำรองไปหน้าเว็บบอร์ด (มือถือ Android บางรุ่นเปิดชื่อ .local ไม่ได้)
+  String body = String("{\"moisturePercent\":") + pct + ",\"ip\":\"" + WiFi.localIP().toString() + "\"}";
   bool ok = mqtt.publish(topicSensor.c_str(), body.c_str());
   evlog("[sensor] publish %s  pct=%d", ok ? "ok" : "FAILED", pct);
 }
