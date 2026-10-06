@@ -389,7 +389,7 @@ bool mqttConnect()
     int st = mqtt.state();
     mqttAuthFailed = (st == MQTT_CONNECT_BAD_CREDENTIALS || st == MQTT_CONNECT_UNAUTHORIZED);
     evlog("[mqtt] connect failed state=%d%s", st,
-          mqttAuthFailed ? " (token ไม่ถูกต้อง — rotate แล้วหรือยัง? ใส่ใหม่ที่ปุ่มตั้งค่าใหม่/BOOT ค้าง 3 วิ)" : "");
+          mqttAuthFailed ? " (token ไม่ถูกต้อง — rotate แล้วหรือยัง? วาง token ใหม่ที่ช่องเปลี่ยน Token บนหน้าเว็บของบอร์ด)" : "");
     return false;
   }
   mqttAuthFailed = false;
@@ -684,12 +684,21 @@ void handleRoot()
   html += "<p id=\"statusText\" style=\"color:#dc3545;font-weight:bold;margin-top:15px;\"></p></div>";
 
   html += "<div class=\"card\"><h2>⚙️ ตั้งค่า</h2>";
+  if (server.arg("saved") == "token")
+    html += "<p style=\"color:#28a745;font-weight:bold;\">✅ บันทึก Token แล้ว — กำลังเชื่อมต่อใหม่ รีเฟรชหน้านี้ในอีก ~10 วิ ดูสถานะ MQTT ด้านล่าง</p>";
+  else if (mqttAuthFailed)
+    html += "<p style=\"color:#dc3545;font-weight:bold;\">❌ Token ไม่ถูกต้อง (rotate บนเว็บแล้ว?) — วาง Token ใหม่ในช่องด้านล่าง</p>";
+  html += "<p style=\"color:#6c757d;font-size:13px;margin-bottom:6px;\">🔑 เปลี่ยน Token — หลังกดปุ่ม 🔑 บนเว็บหลัก · ไม่ล้าง Wi-Fi ไม่ต้องรีบูต</p>";
+  html += "<form method=\"POST\" action=\"/settoken\" style=\"margin-bottom:6px;\">";
+  html += "<input name=\"token\" placeholder=\"วาง Token ใหม่\" autocomplete=\"off\" autocapitalize=\"off\" spellcheck=\"false\" required style=\"width:100%;padding:10px;border:1px solid #cdd;border-radius:7px;font-size:14px;font-family:monospace;box-sizing:border-box;\">";
+  html += "<button type=\"submit\" class=\"btn btn-primary\" style=\"margin-top:8px;\">บันทึก Token</button></form>";
+  html += "<hr style=\"border:0;border-top:1px solid #eee;margin:14px 0;\">";
   html += "<p style=\"color:#6c757d;font-size:13px;margin-bottom:6px;\">Server URL — แก้เมื่อ IP เครื่อง backend เปลี่ยน (เช่น ย้าย Wi-Fi) · ไม่ล้าง Token/Wi-Fi</p>";
   html += "<form method=\"POST\" action=\"/setapi\" style=\"margin-bottom:6px;\">";
   html += "<input name=\"api\" value=\"" + htmlEscape(cfgApiBase) + "\" style=\"width:100%;padding:10px;border:1px solid #cdd;border-radius:7px;font-size:14px;box-sizing:border-box;\">";
   html += "<button type=\"submit\" class=\"btn btn-primary\" style=\"margin-top:8px;\">บันทึก Server URL</button></form>";
   html += "<hr style=\"border:0;border-top:1px solid #eee;margin:14px 0;\">";
-  html += "<p style=\"color:#6c757d;font-size:13px;\">เปลี่ยน Wi-Fi หรือใส่ Token ใหม่ (ล้างค่าทั้งหมด)</p>";
+  html += "<p style=\"color:#6c757d;font-size:13px;\">เปลี่ยน Wi-Fi หรือ Device ID (ล้างค่าทั้งหมด กลับเข้าโหมด PlantPot-Setup)</p>";
   html += "<a href=\"/reset\" class=\"btn btn-gray\" onclick=\"return confirm('ล้างค่าและกลับเข้าโหมดตั้งค่าใหม่?')\">ตั้งค่าใหม่</a></div>";
 
   html += "<div class=\"meta\">MQTT: " + htmlEscape(mqttHost) + ":" + String(mqttPort) +
@@ -771,6 +780,36 @@ void handleSetApi()
   Serial.printf("[config] API base updated -> %s\n", api.c_str());
   mqttSetup(); // ต่อ broker ใหม่ที่ host ใหม่ทันที
   server.sendHeader("Location", "/");
+  server.send(303);
+}
+
+// เปลี่ยนเฉพาะ Token ลง NVS (หลัง rotate บนเว็บ) — Wi-Fi / Device ID / Server URL คงเดิม ไม่ต้องรีบูต
+// ไม่ถาม token เดิม เพราะตอนใช้จริง token เดิมถูก rotate ทิ้งไปแล้ว — สิทธิ์เท่ากับปุ่มตั้งค่าใหม่ (ต้องอยู่ Wi-Fi วงเดียวกัน)
+// token จาก backend = 32 byte เป็น hex 64 ตัว → ตรวจรูปแบบไว้กันวางมาไม่ครบ
+void handleSetToken()
+{
+  String token = server.arg("token");
+  token.trim();
+  bool hex = token.length() == 64;
+  for (size_t i = 0; hex && i < token.length(); i++)
+    hex = isxdigit((unsigned char)token[i]);
+  if (!hex)
+  {
+    server.send(400, "text/html; charset=utf-8",
+                "<meta charset=\"UTF-8\"><body style=\"font-family:sans-serif;text-align:center;padding:40px\">"
+                "<h3>⚠ Token ไม่ถูกรูปแบบ</h3><p>ต้องเป็นตัวอักษร 0-9 a-f ยาว 64 ตัว — คัดลอกจากปุ่ม COPY TOKEN บนเว็บหลักอีกครั้ง</p>"
+                "<a href=\"/\">← กลับ</a></body>");
+    return;
+  }
+  prefs.begin("plantcfg", false);
+  prefs.putString("token", token);
+  prefs.end();
+  cfgToken = token;
+  ArduinoOTA.setPassword(cfgToken.c_str()); // รหัส OTA = token ใหม่ (หน้า /update อ่าน cfgToken ตรง ๆ อยู่แล้ว)
+  mqttAuthFailed = false;
+  evlog("[config] token updated -> reconnect MQTT");
+  mqttSetup(); // ตัด connection เดิมแล้วต่อใหม่ด้วย token ใหม่ในรอบ loop ถัดไป
+  server.sendHeader("Location", "/?saved=token");
   server.send(303);
 }
 
@@ -949,6 +988,7 @@ void setup()
   server.on("/moisture", handleMoisture);
   server.on("/fertilizer", handleFertilizer);
   server.on("/setapi", HTTP_POST, handleSetApi);
+  server.on("/settoken", HTTP_POST, handleSetToken);
   server.on("/reset", handleReset);
   server.on("/log", handleLog);
   server.on("/update", HTTP_GET, handleUpdatePage);

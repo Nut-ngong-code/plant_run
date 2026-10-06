@@ -135,6 +135,7 @@ export function PlantCard({ device, totalPoints, onAction, onDelete, lastSyncedA
       {mode !== "idle" && (
         <CardOverlay
           mode={mode}
+          deviceId={device.deviceId}
           token={issuedToken}
           copied={copied}
           onRotateConfirm={confirmRotate}
@@ -213,7 +214,13 @@ function TrashIcon() {
   );
 }
 
-function CardOverlay({ mode, token, copied, onRotateConfirm, onDeleteConfirm, onCopy, onDismiss }) {
+// ชื่อในเครือข่ายของบอร์ด — ต้องตรงกับ makeHostname() ใน firmware ("POT-001" → "plantpot-pot-001")
+function boardHost(deviceId = "") {
+  return ("plantpot-" + deviceId.toLowerCase().replace(/[^a-z0-9]/g, "-")).slice(0, 40);
+}
+
+function CardOverlay({ mode, deviceId, token, copied, onRotateConfirm, onDeleteConfirm, onCopy, onDismiss }) {
+  const boardUrl = `http://${boardHost(deviceId)}.local`;
   return (
     <div className="absolute inset-0 z-10 rounded-3xl bg-white/85 backdrop-blur-md flex flex-col p-5 gap-4 animate-fade-up">
       {mode === "confirmRotate" && (
@@ -223,7 +230,7 @@ function CardOverlay({ mode, token, copied, onRotateConfirm, onDeleteConfirm, on
             ออก token ใหม่ — token เก่าใช้ไม่ได้ทันที
             <br />
             <span className="text-forest-500 text-xs">
-              นำ token ใหม่ไปใส่ในโหมดตั้งค่าของกระถาง (ปุ่ม “ตั้งค่าใหม่” บนหน้าเว็บของบอร์ด หรือกด BOOT ค้าง 3 วิ) — ไม่ต้อง flash ใหม่
+              นำ token ใหม่ไปวางในช่อง “เปลี่ยน Token” บนหน้าเว็บของบอร์ด ({boardUrl}) — ไม่ต้องตั้ง Wi-Fi ใหม่ ไม่ต้อง flash
             </span>
           </p>
           <div className="mt-auto flex gap-2">
@@ -251,6 +258,13 @@ function CardOverlay({ mode, token, copied, onRotateConfirm, onDeleteConfirm, on
           >
             {copied ? "✓ COPIED" : "COPY TOKEN"}
           </button>
+          <p className="text-[11px] text-forest-500 leading-snug">
+            วางที่{" "}
+            <a href={boardUrl} target="_blank" rel="noreferrer" className="font-mono text-sky2-600 underline">
+              {boardUrl}
+            </a>{" "}
+            → ช่อง “เปลี่ยน Token” (ต้องอยู่ Wi-Fi เดียวกับกระถาง)
+          </p>
           <button onClick={onDismiss} className="btn-primary w-full mt-auto">
             I&apos;VE SAVED IT
           </button>

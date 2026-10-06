@@ -26,6 +26,7 @@ code/
   - **อัปเดตผ่าน Wi-Fi (OTA)** — รหัส = Device Token · (A) Arduino IDE → Port `plantpot-pot-001 at 192.168.x.x` → Upload · (B) Sketch → Export Compiled Binary → `http://plantpot-pot-001.local/update` (user `plantpot`)
   - **Partition Scheme ต้องเป็น "Default 4MB with spiffs"** (มี 2 ช่อง app) — ถ้าเลือก "Huge APP (no OTA)" จะอัปเดตผ่าน Wi-Fi ไม่ได้
   - ดูเหตุการณ์ย้อนหลัง + สาเหตุการรีเซ็ต: `http://plantpot-pot-001.local/log`
+  - **หลัง rotate token บนเว็บ** → เปิด `http://plantpot-pot-001.local` → ช่อง "🔑 เปลี่ยน Token" → บันทึก (แก้เฉพาะ Token · Wi-Fi/Server URL คงเดิม · ไม่ต้องรีบูต) — ปุ่ม "ตั้งค่าใหม่" ใช้เมื่อต้องเปลี่ยน Wi-Fi/Device ID (ล้างทั้งหมด)
   - **ชื่อในเครือข่ายตั้งตาม Device ID** — `POT-001` → `plantpot-pot-001.local` / พอร์ต OTA `plantpot-pot-001` · หลายกระถางในบ้านเดียวกันจึงไม่ชนกัน (ชื่อนี้โชว์ในหน้าเราเตอร์ด้วย) · firmware ก่อน 2026-10-06 ใช้ `plantpot.local` ทุกตัว
 
 ## Quick Start
