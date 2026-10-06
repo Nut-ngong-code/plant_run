@@ -529,38 +529,131 @@ String htmlEscape(const String &s)
   return o;
 }
 
+// ===== 10a. หน้าเว็บบนบอร์ด — ธีมเดียวกับเว็บหลัก (Bright Nature glassmorphism) =====
+// สีตรงกับ frontend/tailwind.config.js: plant (เขียว) · sky2 (ฟ้า/น้ำ) · sun (ส้ม) · forest (ตัวอักษร)
+// ฟอนต์โหลดแบบไม่บล็อก (media=print) — ตอนอยู่โหมด PlantPot-Setup ไม่มีเน็ต หน้าเว็บยังขึ้นทันทีด้วยฟอนต์เครื่อง
+static const char PAGE_CSS[] PROGMEM = R"css(
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;color:#0B1F18;font-family:"Noto Sans Thai",-apple-system,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased;
+background:radial-gradient(ellipse 60% 40% at 0 0,rgba(125,211,252,.4),transparent 60%),radial-gradient(ellipse 50% 35% at 100% 0,rgba(255,179,71,.22),transparent 60%),radial-gradient(ellipse 70% 50% at 50% 100%,rgba(94,214,145,.32),transparent 65%),linear-gradient(180deg,#F4FAF5,#FAFEFB 60%,#EFF8F2);background-attachment:fixed}
+.wrap{max-width:460px;margin:0 auto;padding:16px 16px 40px}
+.top{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:4px 2px 16px}
+.brand{font-family:"Space Grotesk","Noto Sans Thai",sans-serif;font-weight:700;letter-spacing:.08em;font-size:14px;color:#2E4A36;text-decoration:none}
+.brand b{background:linear-gradient(90deg,#0EA15A,#076635);-webkit-background-clip:text;background-clip:text;color:transparent}
+.card{background:rgba(255,255,255,.55);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,.7);border-radius:24px;padding:20px;margin-bottom:14px;box-shadow:0 1px 3px rgba(15,42,30,.05),0 8px 24px -10px rgba(15,42,30,.1)}
+.eye{font-size:10px;text-transform:uppercase;letter-spacing:.22em;color:#42624A;font-weight:600;margin:0 0 12px}
+h1{font-family:"Space Grotesk","Noto Sans Thai",sans-serif;font-size:20px;margin:0;color:#0B1F18}
+.mono{font-family:"JetBrains Mono",ui-monospace,Menlo,monospace}
+.mut{color:#42624A;font-size:13px;line-height:1.6;margin:0}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;font-size:11px;font-weight:600;letter-spacing:.06em;border:1px solid rgba(255,255,255,.6);background:rgba(255,255,255,.45);color:#5E8267;white-space:nowrap}
+.chip i{width:6px;height:6px;border-radius:50%;background:currentColor}
+.ok{background:rgba(197,248,216,.75);color:#076635;border-color:rgba(95,212,145,.5)}
+.ok i{box-shadow:0 0 8px rgba(14,161,90,.6)}
+.bad{background:#FFF1F2;color:#BE123C;border-color:#FECDD3}
+.warn{background:#FFF7E8;color:#B85100;border-color:#FFE6BC}
+.note{border:1px solid;border-radius:14px;padding:10px 12px;font-size:13px;line-height:1.55;margin:0 0 14px}
+.btn{display:block;width:100%;text-align:center;border:0;border-radius:14px;padding:12px 14px;font:inherit;font-size:14px;font-weight:700;color:#fff;cursor:pointer;text-decoration:none;background:linear-gradient(90deg,#2EBE73,#0A8347);box-shadow:0 6px 18px -6px rgba(14,161,90,.55);transition:transform .1s,filter .2s}
+.btn:hover{filter:brightness(1.05)}.btn:active{transform:scale(.97)}.btn:disabled{opacity:.6}
+.water{background:linear-gradient(135deg,#38BDF8,#0284C7);box-shadow:0 6px 18px -6px rgba(14,165,233,.55)}
+.sun{background:linear-gradient(135deg,#FFB347,#E76A00);box-shadow:0 6px 18px -6px rgba(231,106,0,.5)}
+.out{background:rgba(255,255,255,.5);color:#1F3527;border:1px solid #B0C7B5;box-shadow:none;font-weight:600}
+.danger{background:rgba(255,255,255,.6);color:#BE123C;border:1px solid #FECDD3;box-shadow:none;font-weight:600}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+label{display:block;font-size:12px;font-weight:600;color:#2E4A36;margin:0 0 6px}
+input,select{width:100%;background:rgba(255,255,255,.7);border:1px solid #B0C7B5;border-radius:12px;padding:11px 13px;font:inherit;font-size:14px;color:#0B1F18;margin:0 0 10px;outline:none}
+input:focus,select:focus{border-color:#2EBE73;box-shadow:0 0 0 3px rgba(46,190,115,.18)}
+.hint{font-size:11px;color:#5E8267;font-weight:400}
+input::placeholder{font-family:"Noto Sans Thai",-apple-system,"Segoe UI",sans-serif;color:#85A48C}
+.sep{height:1px;background:linear-gradient(90deg,transparent,rgba(176,199,181,.7),transparent);margin:20px 0}
+.gauge{position:relative;width:180px;height:180px;margin:4px auto 10px}
+.gauge svg{transform:rotate(-90deg);display:block}
+.gauge .v{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.big{font-family:"Space Grotesk",sans-serif;font-size:46px;font-weight:700;line-height:1;background:linear-gradient(90deg,#38BDF8,#0284C7);-webkit-background-clip:text;background-clip:text;color:transparent}
+.big small{font-size:20px}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:8px 14px;font-size:13px}
+.kv span:nth-child(odd){color:#42624A}.kv span:nth-child(even){font-weight:600;word-break:break-word}
+pre{white-space:pre-wrap;word-break:break-word;font-size:11.5px;line-height:1.7;margin:0;color:#15291F}
+.foot{text-align:center;font-size:11px;color:#85A48C;margin-top:18px;line-height:1.8}
+a{color:#0284C7}
+)css";
+
+String pageHead(const String &title)
+{
+  String h;
+  h.reserve(6500);
+  h = "<!DOCTYPE html><html lang=\"th\"><head><meta charset=\"UTF-8\">"
+      "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><meta name=\"theme-color\" content=\"#F4FAF5\"><title>";
+  h += title;
+  h += "</title><link rel=\"stylesheet\" media=\"print\" onload=\"this.media='all'\" "
+       "href=\"https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;600;700&family=Space+Grotesk:wght@600;700&family=JetBrains+Mono&display=swap\">"
+       "<style>";
+  h += PAGE_CSS;
+  h += "</style></head><body><div class=\"wrap\">";
+  return h;
+}
+
+String topBar(const String &right)
+{
+  return "<div class=\"top\"><a class=\"brand\" href=\"/\">R⇢ <b>RUN→GROW</b></a>" + right + "</div>";
+}
+
+const char *PAGE_END = "</div></body></html>";
+
+String mqttChip()
+{
+  if (mqtt.connected())
+    return "<span class=\"chip ok\"><i></i>LIVE</span>";
+  if (mqttAuthFailed)
+    return "<span class=\"chip bad\"><i></i>TOKEN ไม่ถูกต้อง</span>";
+  return "<span class=\"chip warn\"><i></i>กำลังเชื่อมต่อ</span>";
+}
+
+// หน้าข้อความสั้น (บันทึกแล้ว / กรอกผิด / กำลังรีสตาร์ท) — การ์ดเดียวกลางจอ
+void sendNotice(int code, const String &title, const String &msg, const String &href, const String &label)
+{
+  String h = pageHead(title);
+  h += "<div class=\"card\" style=\"text-align:center;margin-top:12vh;padding:28px 22px\"><h1>";
+  h += title;
+  h += "</h1><p class=\"mut\" style=\"margin:10px 0 20px\">";
+  h += msg;
+  h += "</p>";
+  if (href.length())
+    h += "<a class=\"btn\" href=\"" + href + "\">" + label + "</a>";
+  h += "</div>";
+  h += PAGE_END;
+  server.send(code, "text/html; charset=utf-8", h);
+}
+
 void handleConfigRoot()
 {
   // ถ้าเคยตั้ง Token แล้ว บอกผู้ใช้ว่าเว้นว่างได้ (แก้ Wi-Fi อย่างเดียว) — #2
-  String tokPh = cfgToken.length() ? "เว้นว่าง = ใช้ Token เดิม" : "วาง Token ที่ได้จากเว็บ";
-  String h = "<!DOCTYPE html><html><head><meta charset=\"UTF-8\">"
-             "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
-             "<style>body{font-family:sans-serif;background:#eef2f1;margin:0;padding:18px;color:#234}"
-             ".card{max-width:420px;margin:0 auto;background:#fff;padding:22px;border-radius:14px;box-shadow:0 6px 20px rgba(0,0,0,.08)}"
-             "h2{margin:0 0 4px}p.sub{margin:0 0 18px;color:#678;font-size:14px}"
-             "label{display:block;font-size:13px;font-weight:600;margin:14px 0 5px}"
-             "input,select{width:100%;box-sizing:border-box;padding:11px;border:1px solid #cdd;border-radius:9px;font-size:15px}"
-             "button{width:100%;margin-top:20px;padding:13px;border:0;border-radius:9px;background:#15a05a;color:#fff;font-size:16px;font-weight:700;cursor:pointer}"
-             ".hint{font-size:12px;color:#89a;margin-top:4px}</style></head><body><div class=\"card\">"
-             "<h2>🌱 ตั้งค่ากระถาง</h2><p class=\"sub\">กรอก Wi-Fi บ้าน และวาง Token จากหน้า \"เพิ่มกระถาง\" บนเว็บ</p>"
-             "<form method=\"POST\" action=\"/save\">"
-             "<label>Wi-Fi ที่บ้าน</label>"
-             "<select id=\"ssidsel\" onchange=\"document.getElementById('ssid').value=this.value\"><option>— กำลังสแกน… —</option></select>"
-             "<input id=\"ssid\" name=\"ssid\" placeholder=\"ชื่อ Wi-Fi\" style=\"margin-top:7px\" value=\"" +
-             htmlEscape(cfgSsid) + "\">"
-                                   "<label>รหัส Wi-Fi</label><input name=\"pass\" type=\"password\" placeholder=\"รหัสผ่าน Wi-Fi\">"
-                                   "<label>Device ID</label><input name=\"devid\" placeholder=\"เช่น POT-001\" value=\"" +
-             htmlEscape(cfgDeviceId) + "\">"
-                                       "<label>Device Token</label><input name=\"token\" placeholder=\"" +
-             tokPh + "\">"
-                     "<label>Server URL <span class=\"hint\">(ใช้ทั้งเว็บและ MQTT — https:// = พอร์ต 8443 · http:// = 1883 · เว้นว่าง = ใช้ค่าเดิม)</span></label>"
-                     "<input name=\"api\" value=\"" +
-             htmlEscape(cfgApiBase.length() ? cfgApiBase : String(DEFAULT_API_BASE)) + "\">"
-                                                                                       "<button type=\"submit\">บันทึก แล้วเชื่อมต่อ</button></form></div>"
-                                                                                       "<script>fetch('/scan').then(r=>r.json()).then(list=>{var s=document.getElementById('ssidsel');"
-                                                                                       "s.innerHTML='<option value=\"\">— เลือกจากที่สแกนเจอ —</option>';"
-                                                                                       "list.forEach(n=>{var o=document.createElement('option');o.value=n;o.textContent=n;s.appendChild(o);});});</script>"
-                                                                                       "</body></html>";
+  String tokPh = cfgToken.length() ? "เว้นว่าง = ใช้ Token เดิม" : "วาง Token ที่ได้จากเว็บหลัก";
+  String h = pageHead("ตั้งค่ากระถาง");
+  h += topBar("<span class=\"chip warn\"><i></i>SETUP</span>");
+  h += "<div class=\"card\"><h1>🌱 ตั้งค่ากระถาง</h1>"
+       "<p class=\"mut\" style=\"margin:6px 0 18px\">กรอก Wi-Fi บ้าน และวาง Token จากหน้า “เพิ่มกระถาง” บนเว็บหลัก</p>"
+       "<form method=\"POST\" action=\"/save\">"
+       "<label>📶 Wi-Fi ที่บ้าน</label>"
+       "<select id=\"ssidsel\" onchange=\"document.getElementById('ssid').value=this.value\"><option>— กำลังสแกน… —</option></select>"
+       "<input id=\"ssid\" name=\"ssid\" placeholder=\"ชื่อ Wi-Fi\" value=\"";
+  h += htmlEscape(cfgSsid);
+  h += "\"><label>รหัส Wi-Fi</label><input name=\"pass\" type=\"password\" placeholder=\"รหัสผ่าน Wi-Fi\">"
+       "<div class=\"sep\" style=\"margin:10px 0 16px\"></div>"
+       "<label>Device ID</label><input class=\"mono\" name=\"devid\" placeholder=\"เช่น POT-001\" value=\"";
+  h += htmlEscape(cfgDeviceId);
+  h += "\"><label>🔑 Device Token</label><input class=\"mono\" name=\"token\" autocomplete=\"off\" autocapitalize=\"off\" spellcheck=\"false\" placeholder=\"";
+  h += tokPh;
+  h += "\"><label>🌐 Server URL <span class=\"hint\">· https:// = MQTT พอร์ต 8443 · http:// = 1883 · เว้นว่าง = ค่าเดิม</span></label>"
+       "<input class=\"mono\" name=\"api\" value=\"";
+  h += htmlEscape(cfgApiBase.length() ? cfgApiBase : String(DEFAULT_API_BASE));
+  h += "\"><button class=\"btn\" type=\"submit\" style=\"margin-top:6px\">บันทึก แล้วเชื่อมต่อ</button></form></div>"
+       "<div class=\"foot\">กระถางจะรีสตาร์ทแล้วต่อ Wi-Fi บ้าน · Wi-Fi “";
+  h += AP_SSID;
+  h += "” จะหายไปเอง</div>"
+       "<script>fetch('/scan').then(function(r){return r.json()}).then(function(list){var s=document.getElementById('ssidsel');"
+       "s.innerHTML='<option value=\"\">— เลือกจากที่สแกนเจอ —</option>';"
+       "list.forEach(function(n){var o=document.createElement('option');o.value=n;o.textContent=n;s.appendChild(o);});});</script>";
+  h += PAGE_END;
   server.send(200, "text/html; charset=utf-8", h);
 }
 
@@ -604,22 +697,16 @@ void handleSave()
 
   if (ssid.length() == 0)
   {
-    server.send(400, "text/html; charset=utf-8",
-                "<meta charset=\"UTF-8\"><body style=\"font-family:sans-serif;text-align:center;padding:40px\">"
-                "<h3>⚠ กรอกไม่ครบ</h3><p>ต้องมีชื่อ Wi-Fi</p><a href=\"/\">← กลับไปแก้</a></body>");
+    sendNotice(400, "⚠ กรอกไม่ครบ", "ต้องมีชื่อ Wi-Fi", "/", "← กลับไปแก้");
     return;
   }
   if (devid.length() == 0 || token.length() == 0)
   {
-    server.send(400, "text/html; charset=utf-8",
-                "<meta charset=\"UTF-8\"><body style=\"font-family:sans-serif;text-align:center;padding:40px\">"
-                "<h3>⚠ กรอกไม่ครบ</h3><p>ครั้งแรกต้องกรอก Device ID และ Token ด้วย</p><a href=\"/\">← กลับไปแก้</a></body>");
+    sendNotice(400, "⚠ กรอกไม่ครบ", "ครั้งแรกต้องกรอก Device ID และ Token ด้วย", "/", "← กลับไปแก้");
     return;
   }
   saveConfig(ssid, pass, devid, token, api);
-  server.send(200, "text/html; charset=utf-8",
-              "<meta charset=\"UTF-8\"><body style=\"font-family:sans-serif;text-align:center;padding:40px;background:#eef2f1\">"
-              "<h2>✓ บันทึกแล้ว</h2><p>กระถางกำลังรีสตาร์ทและเชื่อมต่อ Wi-Fi…<br>ปิดหน้านี้ได้เลย</p></body>");
+  sendNotice(200, "✓ บันทึกแล้ว", "กระถางกำลังรีสตาร์ทและเชื่อมต่อ Wi-Fi บ้าน…<br>ต่อมือถือกลับ Wi-Fi บ้าน แล้วปิดหน้านี้ได้เลย", "", "");
   Serial.println("[config] saved -> restarting");
   delay(1500);
   ESP.restart();
@@ -655,63 +742,72 @@ void startConfigPortal()
 // ===== 11. Local web UI (โหมดใช้งานปกติ) =====
 void handleRoot()
 {
-  String html = "<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">";
-  html += "<style>body{font-family:sans-serif;text-align:center;background:#e9ecef;padding:20px;} .card{background:#fff;padding:20px;border-radius:10px;margin-bottom:20px;box-shadow:0 4px 8px rgba(0,0,0,0.1);} .btn{padding:12px;font-size:16px;color:#fff;background:#28a745;border:none;border-radius:5px;cursor:pointer;margin:5px;text-decoration:none;display:inline-block;} .btn-primary{background:#007bff;} .btn-danger{background:#dc3545;} .btn-gray{background:#6c757d;font-size:13px;padding:8px 12px;} .meta{font-size:12px;color:#6c757d;margin-top:8px;font-family:monospace;}</style></head><body>";
+  int pct = readMoisturePercent();
+  String html = pageHead("กระถาง " + htmlEscape(cfgDeviceId));
+  html.reserve(12000);
+  html += topBar(mqttChip());
 
-  html += "<h1>💧 Run for Water</h1>";
+  // ความชื้น — วงแหวนแบบเดียวกับ MoistureGauge บนเว็บหลัก (r=78 → เส้นรอบวง 490.1)
+  html += "<div class=\"card\" style=\"text-align:center\"><p class=\"eye mono\">";
+  html += htmlEscape(cfgDeviceId);
+  html += "</p><div class=\"gauge\"><svg width=\"180\" height=\"180\" viewBox=\"0 0 180 180\">"
+          "<defs><linearGradient id=\"g\" x1=\"0\" y1=\"0\" x2=\"1\" y2=\"1\"><stop offset=\"0\" stop-color=\"#38BDF8\"/><stop offset=\"1\" stop-color=\"#2EBE73\"/></linearGradient></defs>"
+          "<circle cx=\"90\" cy=\"90\" r=\"78\" fill=\"none\" stroke=\"rgba(176,199,181,.35)\" stroke-width=\"12\"/>"
+          "<circle id=\"arc\" cx=\"90\" cy=\"90\" r=\"78\" fill=\"none\" stroke=\"url(#g)\" stroke-width=\"12\" stroke-linecap=\"round\" "
+          "stroke-dasharray=\"490.1\" style=\"transition:stroke-dashoffset .6s\" stroke-dashoffset=\"";
+  html += String(490.1f * (100 - pct) / 100.0f, 1);
+  html += "\"/></svg><div class=\"v\"><div class=\"big\"><span id=\"pct\">";
+  html += String(pct);
+  html += "</span><small>%</small></div><div class=\"eye\" style=\"margin:8px 0 0\">SOIL MOISTURE</div></div></div>"
+          "<p class=\"mut\">ออโต้ — รดน้ำเมื่อต่ำกว่า ";
+  html += String(AUTO_WATER_ON_PCT);
+  html += "% · หยุดเมื่อเกิน ";
+  html += String(AUTO_WATER_OFF_PCT);
+  html += "%</p></div>";
 
-  html += "<div class=\"card\"><h2>ความชื้นในดิน</h2>";
-  html += "<h1 id=\"moistureValue\" style=\"color:#007bff;font-size:60px;margin:10px 0;\">--</h1>";
-  html += "<p style=\"color:#6c757d;font-size:14px;\">ระบบออโต้: รดน้ำเมื่อ &lt; " + String(AUTO_WATER_ON_PCT) + "% · หยุดเมื่อ &gt; " + String(AUTO_WATER_OFF_PCT) + "%</p></div>";
-
-  html += "<div class=\"card\"><h2>🎛️ ควบคุมด้วยมือ (Manual)</h2>";
+  // ควบคุมด้วยมือ
+  html += "<div class=\"card\"><p class=\"eye\">MANUAL CONTROL</p><div style=\"margin:0 0 14px\">";
   if (isCloudActive)
-  {
-    html += "<p style=\"color:#fd7e14;\">สถานะ: <b>กำลังทำคำสั่งจากเว็บ (" + cloudType + ")</b></p>";
-  }
+    html += "<span class=\"chip ok\"><i></i>กำลังทำคำสั่งจากเว็บ (" + htmlEscape(cloudType) + ")</span>";
   else if (isManualWater)
-  {
-    html += "<p style=\"color:red;\">สถานะ: <b>กำลังแทรกแซงระบบ (เปิดน้ำค้างไว้)</b></p>";
-  }
+    html += "<span class=\"chip warn\"><i></i>เปิดน้ำค้างไว้ · ออโต้หยุดชั่วคราว</span>";
   else
-  {
-    html += "<p style=\"color:green;\">สถานะ: ปล่อยออโต้ทำงานปกติ</p>";
-  }
-  html += "<a href=\"/on\" class=\"btn btn-primary\">เปิดน้ำ (ON)</a>";
-  html += "<a href=\"/off\" class=\"btn btn-danger\">ปิดน้ำ/กลับสู่ออโต้ (OFF)</a></div>";
+    html += "<span class=\"chip\"><i></i>ออโต้ทำงานปกติ</span>";
+  html += "</div><div class=\"row\"><a class=\"btn water\" href=\"/on\">💧 เปิดน้ำ</a><a class=\"btn out\" href=\"/off\">ปิด · กลับออโต้</a></div>"
+          "<button class=\"btn sun\" style=\"margin-top:10px\" onclick=\"fert(this)\">🌿 จ่ายปุ๋ย 5 วินาที</button></div>";
 
-  html += "<div class=\"card\"><h2>🏆 ให้รางวัลต้นไม้</h2>";
-  html += "<button class=\"btn\" onclick=\"giveFertilizer()\">วิ่งครบ 5KM (สั่งจ่ายปุ๋ย 5 วิ)</button>";
-  html += "<p id=\"statusText\" style=\"color:#dc3545;font-weight:bold;margin-top:15px;\"></p></div>";
-
-  html += "<div class=\"card\"><h2>⚙️ ตั้งค่า</h2>";
+  // ตั้งค่า — เรียงตามที่ใช้บ่อย: Token → Server URL → ล้างทั้งหมด
+  html += "<div class=\"card\" id=\"settings\"><p class=\"eye\">SETTINGS</p>";
   if (server.arg("saved") == "token")
-    html += "<p style=\"color:#28a745;font-weight:bold;\">✅ บันทึก Token แล้ว — กำลังเชื่อมต่อใหม่ รีเฟรชหน้านี้ในอีก ~10 วิ ดูสถานะ MQTT ด้านล่าง</p>";
+    html += "<div class=\"note ok\">✓ บันทึก Token แล้ว — กำลังเชื่อมต่อใหม่ รีเฟรชในอีกราว 10 วินาที ป้ายมุมขวาบนควรเป็น LIVE</div>";
   else if (mqttAuthFailed)
-    html += "<p style=\"color:#dc3545;font-weight:bold;\">❌ Token ไม่ถูกต้อง (rotate บนเว็บแล้ว?) — วาง Token ใหม่ในช่องด้านล่าง</p>";
-  html += "<p style=\"color:#6c757d;font-size:13px;margin-bottom:6px;\">🔑 เปลี่ยน Token — หลังกดปุ่ม 🔑 บนเว็บหลัก · ไม่ล้าง Wi-Fi ไม่ต้องรีบูต</p>";
-  html += "<form method=\"POST\" action=\"/settoken\" style=\"margin-bottom:6px;\">";
-  html += "<input name=\"token\" placeholder=\"วาง Token ใหม่\" autocomplete=\"off\" autocapitalize=\"off\" spellcheck=\"false\" required style=\"width:100%;padding:10px;border:1px solid #cdd;border-radius:7px;font-size:14px;font-family:monospace;box-sizing:border-box;\">";
-  html += "<button type=\"submit\" class=\"btn btn-primary\" style=\"margin-top:8px;\">บันทึก Token</button></form>";
-  html += "<hr style=\"border:0;border-top:1px solid #eee;margin:14px 0;\">";
-  html += "<p style=\"color:#6c757d;font-size:13px;margin-bottom:6px;\">Server URL — แก้เมื่อ IP เครื่อง backend เปลี่ยน (เช่น ย้าย Wi-Fi) · ไม่ล้าง Token/Wi-Fi</p>";
-  html += "<form method=\"POST\" action=\"/setapi\" style=\"margin-bottom:6px;\">";
-  html += "<input name=\"api\" value=\"" + htmlEscape(cfgApiBase) + "\" style=\"width:100%;padding:10px;border:1px solid #cdd;border-radius:7px;font-size:14px;box-sizing:border-box;\">";
-  html += "<button type=\"submit\" class=\"btn btn-primary\" style=\"margin-top:8px;\">บันทึก Server URL</button></form>";
-  html += "<hr style=\"border:0;border-top:1px solid #eee;margin:14px 0;\">";
-  html += "<p style=\"color:#6c757d;font-size:13px;\">เปลี่ยน Wi-Fi หรือ Device ID (ล้างค่าทั้งหมด กลับเข้าโหมด PlantPot-Setup)</p>";
-  html += "<a href=\"/reset\" class=\"btn btn-gray\" onclick=\"return confirm('ล้างค่าและกลับเข้าโหมดตั้งค่าใหม่?')\">ตั้งค่าใหม่</a></div>";
+    html += "<div class=\"note bad\">Token ไม่ถูกต้อง — ถ้าเพิ่งกด “ขอ Token ใหม่” บนเว็บหลัก ให้วาง Token ใหม่ด้านล่าง</div>";
+  html += "<form method=\"POST\" action=\"/settoken\"><label>🔑 เปลี่ยน Token</label>"
+          "<input class=\"mono\" name=\"token\" placeholder=\"วาง Token ใหม่ (64 ตัว)\" autocomplete=\"off\" autocapitalize=\"off\" spellcheck=\"false\" required>"
+          "<button class=\"btn\" type=\"submit\">บันทึก Token</button></form>"
+          "<p class=\"mut\" style=\"margin-top:8px;font-size:12px\">ใช้หลังกดขอ Token ใหม่บนเว็บหลัก · Wi-Fi และค่าอื่นคงเดิม ไม่ต้องรีบูต</p>"
+          "<div class=\"sep\"></div>"
+          "<form method=\"POST\" action=\"/setapi\"><label>🌐 Server URL</label><input class=\"mono\" name=\"api\" value=\"";
+  html += htmlEscape(cfgApiBase);
+  html += "\"><button class=\"btn out\" type=\"submit\">บันทึก Server URL</button></form>"
+          "<div class=\"sep\"></div>"
+          "<label>📶 เปลี่ยน Wi-Fi / Device ID</label><p class=\"mut\" style=\"margin:0 0 12px;font-size:12px\">ล้างค่าทั้งหมด แล้วเปิด Wi-Fi “";
+  html += AP_SSID;
+  html += "” ให้ตั้งค่าใหม่จากมือถือ</p>"
+          "<a class=\"btn danger\" href=\"/reset\" onclick=\"return confirm('ล้างค่าทั้งหมดแล้วกลับเข้าโหมดตั้งค่า?')\">ตั้งค่าใหม่ทั้งหมด</a></div>";
 
-  html += "<div class=\"meta\">MQTT: " + htmlEscape(mqttHost) + ":" + String(mqttPort) +
-          (mqtt.connected() ? " ✅ เชื่อมต่อแล้ว" : (mqttAuthFailed ? " ❌ Token ไม่ถูกต้อง" : " ⏳ กำลังเชื่อมต่อ")) +
-          " · Device: " + htmlEscape(cfgDeviceId) + " (" + netHostname + ".local) · <a href=\"/log\">ดู log</a> · <a href=\"/update\">อัปเดต firmware</a></div>";
-
-  html += "<script>";
-  html += "setInterval(() => { fetch('/moisture').then(r=>r.text()).then(d=>document.getElementById('moistureValue').innerText=d); }, 3000);";
-  html += "function giveFertilizer() { document.getElementById('statusText').innerText='ระบบกำลังสับวาล์วจ่ายปุ๋ย...'; fetch('/fertilizer').then(()=>setTimeout(()=>document.getElementById('statusText').innerText='จ่ายปุ๋ยสำเร็จเรียบร้อย!', 5000)); }";
-  html += "</script></body></html>";
-
-  server.send(200, "text/html", html);
+  // เครื่องมือ + ข้อมูลเครือข่าย
+  html += "<div class=\"row\"><a class=\"btn out\" href=\"/log\">📜 ดู Log</a><a class=\"btn out\" href=\"/update\">⬆️ อัปเดต Firmware</a></div>"
+          "<div class=\"foot mono\">";
+  html += netHostname + ".local · " + WiFi.localIP().toString() + "<br>MQTT " + htmlEscape(mqttHost) + ":" + String(mqttPort);
+  html += "</div><script>"
+          "var C=490.1;setInterval(function(){fetch('/moisture').then(function(r){return r.json()}).then(function(d){"
+          "document.getElementById('pct').textContent=d.pct;document.getElementById('arc').style.strokeDashoffset=(C*(100-d.pct)/100).toFixed(1)})},3000);"
+          "function fert(b){b.disabled=true;b.textContent='กำลังจ่ายปุ๋ย…';fetch('/fertilizer').then(function(){setTimeout(function(){"
+          "b.textContent='✓ จ่ายปุ๋ยแล้ว';setTimeout(function(){b.disabled=false;b.textContent='🌿 จ่ายปุ๋ย 5 วินาที'},2500)},5000)})}"
+          "</script>";
+  html += PAGE_END;
+  server.send(200, "text/html; charset=utf-8", html);
 }
 
 void handleOn()
@@ -726,7 +822,11 @@ void handleOff()
   server.sendHeader("Location", "/");
   server.send(303);
 }
-void handleMoisture() { server.send(200, "text/plain", String(analogRead(sensorPin))); }
+// หน้าเว็บบอร์ดดึงทุก 3 วิ — pct = ค่าเดียวกับที่ส่งขึ้นเว็บหลัก · raw = ค่า ADC ไว้ calibrate
+void handleMoisture()
+{
+  server.send(200, "application/json", String("{\"pct\":") + readMoisturePercent() + ",\"raw\":" + analogRead(sensorPin) + "}");
+}
 
 void handleFertilizer()
 {
@@ -743,22 +843,45 @@ void handleFertilizer()
 void handleLog()
 {
   unsigned long t = millis() / 1000;
-  String out;
-  out.reserve(3000);
-  out += "Device: " + cfgDeviceId + "  (http://" + netHostname + ".local)\n";
-  out += "Uptime: " + String(t / 3600) + "h " + String((t / 60) % 60) + "m " + String(t % 60) + "s  (เลขน้อย = เพิ่งรีเซ็ต)\n";
-  out += "Reset reason: " + String(resetReasonText()) + "\n";
-  out += "Wi-Fi: " + String(WiFi.status() == WL_CONNECTED ? "connected" : "DOWN") + "  rssi=" + String(WiFi.RSSI()) + " dBm\n";
-  out += "MQTT: " + String(mqtt.connected() ? "connected" : "DOWN") + "  state=" + String(mqtt.state()) +
-         "  " + mqttHost + ":" + String(mqttPort) + "\n";
-  out += "Free heap: " + String(ESP.getFreeHeap()) + " bytes\n\n--- เหตุการณ์ล่าสุด (ใหม่สุดอยู่บน) ---\n";
+  String upt = String(t / 3600) + "h " + String((t / 60) % 60) + "m " + String(t % 60) + "s";
+  String wifi = String(WiFi.status() == WL_CONNECTED ? "connected" : "DOWN") + "  rssi=" + String(WiFi.RSSI()) + " dBm";
+  String mq = String(mqtt.connected() ? "connected" : "DOWN") + "  state=" + String(mqtt.state()) + "  " + mqttHost + ":" + String(mqttPort);
+  String events;
+  events.reserve(2500);
   for (int i = 1; i <= EVLOG_SIZE; i++)
   {
     const String &line = evLogBuf[(evLogPos - i + EVLOG_SIZE) % EVLOG_SIZE];
     if (line.length())
-      out += line + "\n";
+      events += line + "\n";
   }
-  server.send(200, "text/plain; charset=utf-8", out);
+
+  // /log?txt=1 = ข้อความล้วน ไว้คัดลอกส่งให้คนช่วยดู
+  if (server.hasArg("txt"))
+  {
+    String out = "Device: " + cfgDeviceId + "  (http://" + netHostname + ".local)\n";
+    out += "Uptime: " + upt + "  (เลขน้อย = เพิ่งรีเซ็ต)\nReset reason: " + String(resetReasonText()) + "\n";
+    out += "Wi-Fi: " + wifi + "\nMQTT: " + mq + "\nFree heap: " + String(ESP.getFreeHeap()) + " bytes\n\n--- เหตุการณ์ล่าสุด (ใหม่สุดอยู่บน) ---\n" + events;
+    server.send(200, "text/plain; charset=utf-8", out);
+    return;
+  }
+
+  String h = pageHead("Log · " + htmlEscape(cfgDeviceId));
+  h.reserve(7000);
+  h += topBar(mqttChip());
+  h += "<div class=\"card\"><p class=\"eye\">BOARD STATUS</p><div class=\"kv\">"
+       "<span>Device</span><span class=\"mono\">";
+  h += htmlEscape(cfgDeviceId) + " · " + netHostname + ".local";
+  h += "</span><span>Uptime</span><span class=\"mono\">" + upt + " <span class=\"hint\">(น้อย = เพิ่งรีเซ็ต)</span></span>";
+  h += "<span>Reset</span><span class=\"mono\">" + String(resetReasonText()) + "</span>";
+  h += "<span>Wi-Fi</span><span class=\"mono\">" + wifi + "</span>";
+  h += "<span>MQTT</span><span class=\"mono\">" + htmlEscape(mq) + "</span>";
+  h += "<span>Free heap</span><span class=\"mono\">" + String(ESP.getFreeHeap()) + " bytes</span></div></div>";
+  h += "<div class=\"card\"><p class=\"eye\">RECENT EVENTS · ใหม่สุดอยู่บน</p><pre class=\"mono\">";
+  h += events.length() ? htmlEscape(events) : String("(ยังไม่มี)");
+  h += "</pre></div><div class=\"row\"><a class=\"btn out\" href=\"/log\">↻ รีเฟรช</a><a class=\"btn out\" href=\"/log?txt=1\">ข้อความล้วน</a></div>"
+       "<a class=\"btn\" style=\"margin-top:10px\" href=\"/\">← กลับหน้ากระถาง</a>";
+  h += PAGE_END;
+  server.send(200, "text/html; charset=utf-8", h);
 }
 
 // อัปเดตแค่ Server URL ลง NVS แบบไม่ล้างค่าอื่น — ใช้ตอน IP เครื่อง backend เปลี่ยน (เช่น Wi-Fi หอ)
@@ -769,9 +892,7 @@ void handleSetApi()
   api.trim();
   if (api.length() == 0)
   {
-    server.send(400, "text/html; charset=utf-8",
-                "<meta charset=\"UTF-8\"><body style=\"font-family:sans-serif;text-align:center;padding:40px\">"
-                "<h3>⚠ ต้องกรอก Server URL</h3><a href=\"/\">← กลับ</a></body>");
+    sendNotice(400, "⚠ ต้องกรอก Server URL", "เช่น https://plantvm.xxx.ts.net", "/#settings", "← กลับ");
     return;
   }
   prefs.begin("plantcfg", false);
@@ -796,10 +917,7 @@ void handleSetToken()
     hex = isxdigit((unsigned char)token[i]);
   if (!hex)
   {
-    server.send(400, "text/html; charset=utf-8",
-                "<meta charset=\"UTF-8\"><body style=\"font-family:sans-serif;text-align:center;padding:40px\">"
-                "<h3>⚠ Token ไม่ถูกรูปแบบ</h3><p>ต้องเป็นตัวอักษร 0-9 a-f ยาว 64 ตัว — คัดลอกจากปุ่ม COPY TOKEN บนเว็บหลักอีกครั้ง</p>"
-                "<a href=\"/\">← กลับ</a></body>");
+    sendNotice(400, "⚠ Token ไม่ถูกรูปแบบ", "ต้องเป็นตัวอักษร 0-9 a-f ยาว 64 ตัว — กด COPY TOKEN บนเว็บหลักแล้ววางใหม่อีกครั้ง", "/#settings", "← กลับไปวางใหม่");
     return;
   }
   prefs.begin("plantcfg", false);
@@ -810,16 +928,14 @@ void handleSetToken()
   mqttAuthFailed = false;
   evlog("[config] token updated -> reconnect MQTT");
   mqttSetup(); // ตัด connection เดิมแล้วต่อใหม่ด้วย token ใหม่ในรอบ loop ถัดไป
-  server.sendHeader("Location", "/?saved=token");
+  server.sendHeader("Location", "/?saved=token#settings");
   server.send(303);
 }
 
 // ล้างค่า + กลับเข้าโหมดตั้งค่า (AP)
 void handleReset()
 {
-  server.send(200, "text/html; charset=utf-8",
-              "<meta charset=\"UTF-8\"><body style=\"font-family:sans-serif;text-align:center;padding:40px\">"
-              "<h2>กำลังกลับเข้าโหมดตั้งค่า…</h2><p>เชื่อมต่อ Wi-Fi \"PlantPot-Setup\" อีกครั้ง</p></body>");
+  sendNotice(200, "กำลังกลับเข้าโหมดตั้งค่า…", String("ต่อมือถือเข้า Wi-Fi “") + AP_SSID + "” แล้วหน้าตั้งค่าจะเปิดขึ้นเอง", "", "");
   Serial.println("[config] reset requested");
   emergencyStop(); // ปิดทันทีก่อนรีบูต (ไม่ดูดสาย — loop ไม่ได้ทำงานต่อแล้ว)
   delay(800);
@@ -871,15 +987,16 @@ void handleUpdatePage()
 {
   if (!server.authenticate(OTA_USER, cfgToken.c_str()))
     return server.requestAuthentication();
-  server.send(200, "text/html; charset=utf-8",
-              "<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
-              "<style>body{font-family:sans-serif;background:#eef2f1;padding:18px;color:#234}.card{max-width:420px;margin:0 auto;background:#fff;padding:22px;border-radius:14px}"
-              "input{width:100%;margin:14px 0;font-size:15px}button{width:100%;padding:13px;border:0;border-radius:9px;background:#15a05a;color:#fff;font-size:16px;font-weight:700}"
-              ".hint{font-size:13px;color:#678}</style></head><body><div class=\"card\"><h2>⬆️ อัปเดต firmware</h2>"
-              "<p class=\"hint\">Arduino IDE → Sketch → Export Compiled Binary → เลือกไฟล์ <b>esp32_v-1.ino.bin</b><br>ระหว่างอัปเดตปั๊มและวาล์วจะถูกปิด · เสร็จแล้วบอร์ดรีสตาร์ทเอง</p>"
-              "<form method=\"POST\" action=\"/update\" enctype=\"multipart/form-data\" onsubmit=\"this.querySelector('button').innerText='กำลังอัปโหลด… อย่าปิดหน้านี้'\">"
-              "<input type=\"file\" name=\"firmware\" accept=\".bin\" required><button type=\"submit\">อัปโหลดและติดตั้ง</button></form>"
-              "<p class=\"hint\"><a href=\"/\">← กลับ</a></p></div></body></html>");
+  String h = pageHead("อัปเดต Firmware");
+  h += topBar(mqttChip());
+  h += "<div class=\"card\"><h1>⬆️ อัปเดต Firmware</h1>"
+       "<p class=\"mut\" style=\"margin:6px 0 16px\">Arduino IDE → Sketch → Export Compiled Binary → เลือกไฟล์ <b class=\"mono\">esp32_v-1.ino.bin</b><br>"
+       "ระหว่างอัปเดตปั๊มและวาล์วจะถูกปิด · เสร็จแล้วบอร์ดรีสตาร์ทเอง</p>"
+       "<form method=\"POST\" action=\"/update\" enctype=\"multipart/form-data\" onsubmit=\"var b=this.querySelector('button');b.disabled=true;b.textContent='กำลังอัปโหลด… อย่าปิดหน้านี้'\">"
+       "<input type=\"file\" name=\"firmware\" accept=\".bin\" required><button class=\"btn\" type=\"submit\">อัปโหลดและติดตั้ง</button></form></div>"
+       "<a class=\"btn out\" href=\"/\">← กลับหน้ากระถาง</a>";
+  h += PAGE_END;
+  server.send(200, "text/html; charset=utf-8", h);
 }
 
 // รับไฟล์ทีละก้อนแล้วเขียนลงแฟลชเลย (ไม่เก็บทั้งไฟล์ใน RAM)
@@ -924,11 +1041,10 @@ void handleUpdateDone()
   if (!webOtaAuthed)
     return server.requestAuthentication();
   bool ok = !Update.hasError() && Update.isFinished();
-  server.send(ok ? 200 : 500, "text/html; charset=utf-8",
-              String("<meta charset=\"UTF-8\"><body style=\"font-family:sans-serif;text-align:center;padding:40px\">") +
-                  (ok ? "<h2>✓ อัปเดตสำเร็จ</h2><p>บอร์ดกำลังรีสตาร์ท… รอราว 20 วิแล้วเปิด <a href=\"/log\">/log</a> ดูได้</p>"
-                      : String("<h2>✗ อัปเดตไม่สำเร็จ</h2><p>") + Update.errorString() + "</p><p>บอร์ดยังใช้ firmware เดิม</p><a href=\"/update\">ลองใหม่</a>") +
-                  "</body>");
+  if (ok)
+    sendNotice(200, "✓ อัปเดตสำเร็จ", "บอร์ดกำลังรีสตาร์ท… รอราว 20 วินาทีแล้วเปิด Log ดูได้", "/log", "ดู Log");
+  else
+    sendNotice(500, "✗ อัปเดตไม่สำเร็จ", String(Update.errorString()) + "<br>บอร์ดยังใช้ firmware เดิม", "/update", "ลองใหม่");
   if (ok)
   {
     delay(1000);

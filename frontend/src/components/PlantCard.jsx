@@ -97,6 +97,24 @@ export function PlantCard({ device, totalPoints, onAction, onDelete, lastSyncedA
         <div className="flex items-center gap-1 shrink-0">
           <button
             type="button"
+            onClick={() => setMode("board")}
+            title="ตั้งค่ากระถาง — เปลี่ยน Token / Wi-Fi / ดู Log"
+            className="h-7 w-7 rounded-full flex items-center justify-center text-forest-500 hover:text-forest-800 hover:bg-white/60 transition"
+            aria-label="ตั้งค่ากระถาง"
+          >
+            <GearIcon />
+          </button>
+          <button
+            type="button"
+            onClick={() => setMode("confirmRotate")}
+            title="ขอ Token ใหม่"
+            className="h-7 w-7 rounded-full flex items-center justify-center text-forest-500 hover:text-forest-800 hover:bg-white/60 transition"
+            aria-label="ขอ Token ใหม่"
+          >
+            <KeyIcon />
+          </button>
+          <button
+            type="button"
             onClick={() => setMode("confirmDelete")}
             title="Remove this pot"
             className="h-7 w-7 rounded-full flex items-center justify-center text-forest-500 hover:text-rose-600 hover:bg-rose-50 transition"
@@ -165,20 +183,11 @@ export function PlantCard({ device, totalPoints, onAction, onDelete, lastSyncedA
         />
       </div>
 
-      <div className="grid grid-cols-2 gap-2.5">
-        <button type="button" onClick={() => setMode("board")} className="btn-outline flex items-center justify-center gap-1.5 text-xs">
-          <BoardIcon /> ตั้งค่ากระถาง
-        </button>
-        <button type="button" onClick={() => setMode("confirmRotate")} className="btn-outline flex items-center justify-center gap-1.5 text-xs">
-          <KeyIcon /> ขอ Token ใหม่
-        </button>
-      </div>
-
       {!device.isOnline && (
         <div className="text-[11px] text-rose-700 bg-rose-50/80 border border-rose-200 rounded-lg px-3 py-2 text-center leading-relaxed">
           <div className="font-mono tracking-wide">DEVICE OFFLINE — RECONNECT ESP32 TO SEND COMMANDS</div>
           <div className="text-forest-600 mt-1">
-            เพิ่งขอ Token ใหม่หรือย้าย Wi-Fi? กด <b>ตั้งค่ากระถาง</b> เพื่อวาง Token ใหม่ / ดู Log
+            เพิ่งขอ Token ใหม่หรือย้าย Wi-Fi? กด <b>⚙️</b> มุมขวาบนของการ์ด เพื่อวาง Token ใหม่ / ดู Log
           </div>
         </div>
       )}
@@ -198,11 +207,12 @@ export function PlantCard({ device, totalPoints, onAction, onDelete, lastSyncedA
   );
 }
 
-function BoardIcon() {
+function GearIcon() {
   return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
          strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6" />
+      <circle cx="12" cy="12" r="3" />
+      <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z" />
     </svg>
   );
 }
@@ -292,7 +302,7 @@ function CardOverlay({ mode, deviceId, localIp, token, copied, onRotateConfirm, 
             ออก token ใหม่ — token เก่าใช้ไม่ได้ทันที
             <br />
             <span className="text-forest-500 text-xs">
-              ขั้นต่อไป: คัดลอก token ใหม่ → กด “ตั้งค่ากระถาง” (หรือลิงก์ที่จะขึ้นถัดไป) → วางในช่อง “🔑 เปลี่ยน Token” → บันทึก — ไม่ต้องตั้ง Wi-Fi ใหม่ ไม่ต้อง flash
+              ขั้นต่อไป: คัดลอก token ใหม่ → กดปุ่มที่จะขึ้นถัดไป (หรือ ⚙️ มุมขวาบน) → วางในช่อง “🔑 เปลี่ยน Token” → บันทึก — ไม่ต้องตั้ง Wi-Fi ใหม่ ไม่ต้อง flash
             </span>
           </p>
           <div className="mt-auto flex gap-2">
