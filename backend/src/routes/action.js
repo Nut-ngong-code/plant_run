@@ -4,6 +4,7 @@ import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
 import { actionCost } from "../lib/config.js";
 import { HttpError } from "../middleware/error.js";
+import { dispatchNext } from "../lib/mqtt.js";
 
 export const actionRouter = Router();
 
@@ -68,4 +69,7 @@ actionRouter.post("/", async (req, res) => {
     action: result.action,
     remainingPoints: result.remainingPoints,
   });
+
+  // ถ้า ESP32 ต่อ MQTT อยู่ ส่งคำสั่งลงไปทันที (ไม่ต้องรอ poll) — ออฟไลน์อยู่ก็รอเป็น pending ใน DB
+  dispatchNext(device.id);
 });

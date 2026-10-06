@@ -4,11 +4,14 @@ import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
 import { HttpError } from "../middleware/error.js";
 import { requireDeviceAuth, generateToken, hashToken } from "../middleware/deviceAuth.js";
+import { applyAck } from "../lib/commands.js";
+import { kickDevice } from "../lib/mqtt.js";
 
 export const deviceRouter = Router();
 
 // GET /api/device/:deviceId/command
 // ESP32 polls นี้เป็นระยะ เพื่อเช็คว่ามีคำสั่ง pending รออยู่ไหม
+// (firmware ปัจจุบันรับคำสั่งผ่าน MQTT แล้ว — endpoint นี้คงไว้ให้ firmware แบบ polling สำรองใช้ได้)
 // ถ้ามี -> เปลี่ยน status เป็น "executing" และส่งคำสั่งกลับไป
 deviceRouter.get("/:deviceId/command", requireDeviceAuth, async (req, res) => {
   const device = req.device; // verified by requireDeviceAuth
@@ -47,23 +50,11 @@ deviceRouter.post("/:deviceId/command/:commandId/ack", requireDeviceAuth, async 
   if (!Number.isInteger(commandId)) throw new HttpError(400, "Invalid command id");
   const { status } = ackBody.parse(req.body);
 
-  const action = await prisma.actionLog.findUnique({ where: { id: commandId } });
-  if (!action) throw new HttpError(404, "Command not found");
+  // ตรรกะเดียวกับ ack ผ่าน MQTT — คืนแต้มถ้า failed, ไม่รับ ack ของคำสั่งที่ไม่ใช่ของอุปกรณ์นี้/จบไปแล้ว
+  const result = await applyAck(req.device.id, commandId, status);
+  if (!result) throw new HttpError(404, "Command not found");
 
-  const updated = await prisma.actionLog.update({
-    where: { id: commandId },
-    data: { status, executedAt: new Date() },
-  });
-
-  // ถ้า failed — คืนแต้มให้ผู้ใช้
-  if (status === "failed" && action.pointsDeducted) {
-    await prisma.user.update({
-      where: { id: action.userId },
-      data: { totalPoints: { increment: action.pointsDeducted } },
-    });
-  }
-
-  res.json({ id: updated.id, status: updated.status });
+  res.json({ id: result.action.id, status: result.action.status });
 });
 
 // GET /api/device/:deviceId/soil-history?limit=200
@@ -116,6 +107,7 @@ deviceRouter.post("/:deviceId/rotate-token", async (req, res) => {
     where: { id: device.id },
     data: { authTokenHash: tokenHash },
   });
+  kickDevice(device.id); // token เก่าใช้ต่อไม่ได้ — ตัด MQTT connection เดิมทิ้ง ESP32 จะต่อใหม่ไม่ผ่านจนกว่าจะใส่ token ใหม่
 
   res.json({
     device: {
@@ -162,6 +154,7 @@ deviceRouter.delete("/:deviceId", async (req, res) => {
     await tx.device.delete({ where: { id: device.id } });
     return { refunded: refund, pendingCanceled: pending.length };
   });
+  kickDevice(device.id);
 
   res.json({ deviceId, ...result });
 });

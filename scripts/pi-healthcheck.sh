@@ -99,6 +99,19 @@ else
   warn "อ่านชื่อโดเมนจาก tailscale ไม่ได้ — ข้ามการตรวจ Funnel"
 fi
 
+# MQTT — ESP32 รับคำสั่งผ่านช่องนี้ (backend ฟังที่ 1883 · Funnel เปิดออกที่ 8443)
+if timeout 3 bash -c '</dev/tcp/127.0.0.1/1883' 2>/dev/null; then
+  ok "MQTT broker ฟังที่ localhost:1883"
+else
+  bad "MQTT broker ไม่ฟังที่ 1883 → ESP32 รับคำสั่งไม่ได้ (ดู MQTT_PORT ใน .env / log ของ backend)"
+fi
+if tailscale funnel status 2>/dev/null | grep -q '8443'; then
+  ok "Funnel เปิด MQTT ที่ :8443"
+else
+  bad "Funnel ยังไม่เปิดพอร์ต 8443 ให้ MQTT"
+  echo "     แก้: sudo tailscale funnel --bg --tls-terminated-tcp=8443 tcp://localhost:1883"
+fi
+
 head_ "6. ข้อมูลในฐานข้อมูล"
 if [ -n "$DB_STATUS" ] && echo "$DB_STATUS" | grep -q '^Up'; then
   docker exec plant_mysql_db mysql -uplant_dev -pdevpassword123 plant_run_db -N -B -e \
