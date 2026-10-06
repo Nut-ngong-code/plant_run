@@ -144,6 +144,21 @@ sudo tailscale funnel --bg --tls-terminated-tcp=8443 tcp://localhost:1883
 tailscale funnel status                        # ต้องเห็นทั้ง :443 และ :8443 พร้อม (Funnel on)
 ```
 
+### ทางเลือก 9B — ใช้ชื่อใหม่ (เก็บ `respi` ไว้เป็นเครื่องสำรอง)
+
+ไม่ต้องลบเครื่อง `respi` — ตั้งชื่อ VM ใหม่ เช่น `plantvm` แลกกับการที่ URL เปลี่ยน ต้องแก้เพิ่ม 3 จุด:
+```bash
+sudo tailscale up --hostname=plantvm
+sudo tailscale funnel --bg 3000
+sudo tailscale funnel --bg --tls-terminated-tcp=8443 tcp://localhost:1883
+```
+1. **`.env` บน VM** → `FRONTEND_URL` และ `STRAVA_REDIRECT_URI` เป็น `https://plantvm.<tailnet>.ts.net...` แล้ว `sudo systemctl restart plant-backend`
+2. **Strava** → https://www.strava.com/settings/api → Authorization Callback Domain = `plantvm.<tailnet>.ts.net` (**ใส่ได้โดเมนเดียว** — สลับกลับ Pi ต้องแก้คืน)
+3. **ESP32** → `http://plantpot.local` → ช่อง Server URL = `https://plantvm.<tailnet>.ts.net` → บันทึก (ไม่ต้อง flash / ไม่ต้องเปลี่ยน token)
+
+> **ใช้งานจริงได้ทีละเครื่อง** — ฐานข้อมูลของ VM กับ Pi แยกกัน ทุกครั้งที่สลับ: dump จากเครื่องที่ใช้อยู่ → import เข้าอีกเครื่อง → ค่อยเปลี่ยน 3 จุดข้างบน
+> เครื่อง `respi` ใน Tailscale ใช้สำรองได้เฉพาะถ้า SD card ของ Pi ไม่เสีย (ตัวตนของเครื่องเก็บอยู่บน SD) — ถ้าต้อง flash SD ใหม่ ให้ลบ `respi` เก่าแล้วตั้งชื่อเดิมให้ Pi ตัวใหม่
+
 ## ขั้นที่ 10 — ให้โน้ตบุ๊กทำงานต่อเนื่อง
 
 **ห้าม sleep** — PowerShell (Run as Administrator):
