@@ -8,7 +8,7 @@ const COST = { water: 15, fertilizer: 20 };
 export function PlantCard({ device, totalPoints, onAction, onDelete, lastSyncedAt, userId }) {
   const [busyType, setBusyType] = useState(null);
   const [errorMsg, setErrorMsg] = useState(null);
-  // Overlay mode: idle | confirmRotate | rotating | issued | confirmDelete | deleting
+  // Overlay mode: idle | board | confirmRotate | rotating | issued | confirmDelete | deleting
   const [mode, setMode] = useState("idle");
   const [issuedToken, setIssuedToken] = useState(null);
   const [copied, setCopied] = useState(false);
@@ -95,6 +95,15 @@ export function PlantCard({ device, totalPoints, onAction, onDelete, lastSyncedA
           </h3>
         </div>
         <div className="flex items-center gap-1 shrink-0">
+          <button
+            type="button"
+            onClick={() => setMode("board")}
+            title="Open the pot's own web page (settings / log)"
+            className="h-7 w-7 rounded-full flex items-center justify-center text-forest-500 hover:text-forest-800 hover:bg-white/60 transition"
+            aria-label="open board page"
+          >
+            <BoardIcon />
+          </button>
           <button
             type="button"
             onClick={() => setMode("confirmRotate")}
@@ -194,6 +203,15 @@ export function PlantCard({ device, totalPoints, onAction, onDelete, lastSyncedA
   );
 }
 
+function BoardIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+         strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6" />
+    </svg>
+  );
+}
+
 function KeyIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -223,6 +241,28 @@ function CardOverlay({ mode, deviceId, token, copied, onRotateConfirm, onDeleteC
   const boardUrl = `http://${boardHost(deviceId)}.local`;
   return (
     <div className="absolute inset-0 z-10 rounded-3xl bg-white/85 backdrop-blur-md flex flex-col p-5 gap-4 animate-fade-up">
+      {mode === "board" && (
+        <>
+          <div className="label-eyebrow text-sky2-600">📡 หน้าเว็บของกระถาง</div>
+          <div className="font-mono text-[11px] text-forest-600 break-all">{boardUrl}</div>
+          <div className="flex flex-col gap-2">
+            <a href={boardUrl} target="_blank" rel="noreferrer" className="btn-outline block w-full text-center">
+              ตั้งค่า / ควบคุม
+            </a>
+            <a href={`${boardUrl}/log`} target="_blank" rel="noreferrer" className="btn-outline block w-full text-center">
+              ดู LOG
+            </a>
+            <a href={`${boardUrl}/update`} target="_blank" rel="noreferrer" className="btn-outline block w-full text-center">
+              อัปเดต FIRMWARE
+            </a>
+          </div>
+          <p className="text-[11px] text-forest-500 leading-snug">
+            ต้องใช้อุปกรณ์ที่อยู่ Wi-Fi เดียวกับกระถาง · เปิดได้แม้การ์ดขึ้น OFFLINE (เช่น Token ไม่ถูกต้อง) ·
+            ถ้าเปิดชื่อนี้ไม่ขึ้น (มือถือ Android บางรุ่น) ให้ใช้ IP ของบอร์ดจากหน้าเราเตอร์แทน
+          </p>
+          <button onClick={onDismiss} className="btn-primary w-full mt-auto">CLOSE</button>
+        </>
+      )}
       {mode === "confirmRotate" && (
         <>
           <div className="label-eyebrow text-sun-700">⚠ ROTATE DEVICE TOKEN</div>
