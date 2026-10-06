@@ -87,7 +87,7 @@ pnpm -v          # 10.x
 
 ```bash
 git clone https://github.com/Nut-ngong-code/plant_run.git ~/final-project
-cd ~/final-project && git checkout feat/mqtt      # หรือ main หลัง merge MQTT แล้ว
+cd ~/final-project && git checkout main      # MQTT merge เข้า main แล้ว (ae8e3c8) — ห้ามอยู่ feat/mqtt: branch นั้นหยุดอัปเดตแล้ว git pull จะไม่ได้ของใหม่
 
 cd database && docker compose up -d --build       # ใช้ docker-compose.yml ตัวหลัก — ไม่ใช่ .pi.yml (ตัวนั้นชี้ /mnt/ssd)
 docker ps                                          # plant_mysql_db ต้อง Up
