@@ -4,9 +4,9 @@
 #include <PubSubClient.h>     // MQTT client — ติดตั้งจาก Library Manager: "PubSubClient" by Nick O'Leary
 #include <Preferences.h>      // เก็บค่าตั้งค่า (Wi-Fi/Token) ลง NVS ถาวร
 #include <DNSServer.h>        // captive portal — ดึงหน้าตั้งค่าให้เด้งเอง
-#include <ESPmDNS.h>          // เข้าหน้าตั้งค่าที่ http://plantpot.local โดยไม่ต้องรู้ IP ของบอร์ด
+#include <ESPmDNS.h>          // เข้าหน้าเว็บของบอร์ดที่ http://plantpot-<deviceid>.local โดยไม่ต้องรู้ IP ของบอร์ด
 #include <esp_system.h>       // esp_reset_reason() — บอร์ดรีเซ็ตเพราะอะไร (ไฟตก/watchdog/...)
-#include <ArduinoOTA.h>       // อัปเดต firmware ผ่าน Wi-Fi จาก Arduino IDE (พอร์ตเครือข่าย "plantpot")
+#include <ArduinoOTA.h>       // อัปเดต firmware ผ่าน Wi-Fi จาก Arduino IDE (พอร์ตเครือข่าย "plantpot-<deviceid>")
 #include <Update.h>           // อัปเดต firmware ด้วยไฟล์ .bin ผ่านหน้าเว็บ /update
 
 // ============================================================================
@@ -59,7 +59,22 @@ const unsigned long MQTT_AUTH_RETRY_MS = 60000; // token ผิด (เช่น
 
 // ===== 6. State =====
 WebServer server(80);
-bool mdnsUp = false; // เริ่ม mDNS responder (plantpot.local) แล้วหรือยัง
+bool mdnsUp = false; // เริ่ม mDNS responder แล้วหรือยัง
+String netHostname = "plantpot"; // ชื่อในเครือข่าย — ตั้งตาม Device ID ใน setup() (makeHostname)
+
+// ชื่อเครื่องในเครือข่ายตาม Device ID — หลายกระถางในบ้านเดียวกันจะได้ไม่ชนกัน
+// "POT-001" → "plantpot-pot-001" ใช้เป็น mDNS (.local) · พอร์ต OTA ใน Arduino IDE · ชื่อที่โชว์ในหน้าเราเตอร์ (DHCP)
+// hostname ใช้ได้แค่ a-z 0-9 และ - จึงแปลงตัวอื่นเป็น -
+String makeHostname(const String &id)
+{
+  String h = "plantpot-";
+  for (size_t i = 0; i < id.length() && h.length() < 40; i++)
+  {
+    char c = tolower((unsigned char)id[i]);
+    h += isalnum((unsigned char)c) ? c : '-';
+  }
+  return h;
+}
 
 bool isFertilizing = false;
 unsigned long fertStartTime = 0;
@@ -86,7 +101,7 @@ String pendingAckStatus = "";
 long recentCmdIds[4] = {-1, -1, -1, -1}; // กันคำสั่งซ้ำ (QoS 1 ส่งซ้ำได้) — ปั๊มต้องไม่ทำงานสองรอบ
 int recentCmdPos = 0;
 
-// ===== 6b. Event log — ดูย้อนหลังได้ที่ http://plantpot.local/log โดยไม่ต้องต่อ USB =====
+// ===== 6b. Event log — ดูย้อนหลังได้ที่ http://plantpot-<deviceid>.local/log โดยไม่ต้องต่อ USB =====
 const int EVLOG_SIZE = 30;
 String evLogBuf[EVLOG_SIZE];
 int evLogPos = 0;
@@ -679,7 +694,7 @@ void handleRoot()
 
   html += "<div class=\"meta\">MQTT: " + htmlEscape(mqttHost) + ":" + String(mqttPort) +
           (mqtt.connected() ? " ✅ เชื่อมต่อแล้ว" : (mqttAuthFailed ? " ❌ Token ไม่ถูกต้อง" : " ⏳ กำลังเชื่อมต่อ")) +
-          " · Device: " + htmlEscape(cfgDeviceId) + " · <a href=\"/log\">ดู log</a> · <a href=\"/update\">อัปเดต firmware</a></div>";
+          " · Device: " + htmlEscape(cfgDeviceId) + " (" + netHostname + ".local) · <a href=\"/log\">ดู log</a> · <a href=\"/update\">อัปเดต firmware</a></div>";
 
   html += "<script>";
   html += "setInterval(() => { fetch('/moisture').then(r=>r.text()).then(d=>document.getElementById('moistureValue').innerText=d); }, 3000);";
@@ -720,6 +735,7 @@ void handleLog()
   unsigned long t = millis() / 1000;
   String out;
   out.reserve(3000);
+  out += "Device: " + cfgDeviceId + "  (http://" + netHostname + ".local)\n";
   out += "Uptime: " + String(t / 3600) + "h " + String((t / 60) % 60) + "m " + String(t % 60) + "s  (เลขน้อย = เพิ่งรีเซ็ต)\n";
   out += "Reset reason: " + String(resetReasonText()) + "\n";
   out += "Wi-Fi: " + String(WiFi.status() == WL_CONNECTED ? "connected" : "DOWN") + "  rssi=" + String(WiFi.RSSI()) + " dBm\n";
@@ -773,8 +789,8 @@ void handleReset()
 
 // ===== 11b. OTA — อัปเดต firmware ผ่าน Wi-Fi ไม่ต้องเสียบ USB =====
 // รหัสผ่าน = Device Token (rotate token บนเว็บ → รหัส OTA เปลี่ยนตามอัตโนมัติ หลังใส่ token ใหม่ในบอร์ด)
-// ช่องทาง A: Arduino IDE → Tools → Port → "plantpot at 192.168.x.x" → Upload (ถามรหัส = token)
-// ช่องทาง B: Sketch → Export Compiled Binary → เปิด http://plantpot.local/update (user: plantpot / รหัส: token)
+// ช่องทาง A: Arduino IDE → Tools → Port → "plantpot-pot-001 at 192.168.x.x" → Upload (ถามรหัส = token)
+// ช่องทาง B: Sketch → Export Compiled Binary → เปิด http://plantpot-pot-001.local/update (user: plantpot / รหัส: token)
 // ต้องอยู่ Wi-Fi วงเดียวกับบอร์ด · ถ้า flash ไม่ครบ บอร์ดบูต firmware เดิมต่อ (เขียนลงอีก partition)
 const char *OTA_USER = "plantpot";
 bool otaStarted = false;
@@ -795,9 +811,9 @@ void prepareForOta()
 
 void startArduinoOta()
 {
-  ArduinoOTA.setHostname("plantpot");
+  ArduinoOTA.setHostname(netHostname.c_str());
   ArduinoOTA.setPassword(cfgToken.c_str());
-  ArduinoOTA.setMdnsEnabled(false); // ประกาศ mDNS เองใน loop (MDNS.enableArduino) กันชนกับ plantpot.local
+  ArduinoOTA.setMdnsEnabled(false); // ประกาศ mDNS เองใน loop (MDNS.enableArduino) ไม่ให้ ArduinoOTA ตั้ง mDNS ซ้อน
   ArduinoOTA.onStart([]()
                      {
     prepareForOta();
@@ -808,7 +824,7 @@ void startArduinoOta()
                      { evlog("[ota] IDE upload error=%u", (unsigned)e); });
   ArduinoOTA.begin();
   otaStarted = true;
-  evlog("[ota] ready (Arduino IDE port: plantpot)");
+  evlog("[ota] ready (Arduino IDE port: %s)", netHostname.c_str());
 }
 
 void handleUpdatePage()
@@ -900,6 +916,8 @@ void setup()
   }
 
   // ต่อ Wi-Fi บ้าน (DHCP — ใช้ได้กับ router ทุกวง)
+  netHostname = makeHostname(cfgDeviceId);
+  WiFi.setHostname(netHostname.c_str()); // ต้องตั้งก่อน WiFi.mode/begin ไม่งั้น DHCP ใช้ชื่อเริ่มต้น
   WiFi.mode(WIFI_STA);
   WiFi.setAutoReconnect(true); // ให้ stack ต่อกลับเองเมื่อ Wi-Fi กลับมา
   WiFi.begin(cfgSsid.c_str(), cfgPass.c_str());
@@ -961,7 +979,7 @@ void loop()
     WiFi.begin(cfgSsid.c_str(), cfgPass.c_str());
   }
 
-  // mDNS: เข้าหน้าตั้งค่าที่ http://plantpot.local ได้โดยไม่ต้องรู้ IP ของบอร์ด (IP หอเปลี่ยนบ่อย)
+  // mDNS: เข้าหน้าเว็บของบอร์ดที่ http://plantpot-<deviceid>.local ได้โดยไม่ต้องรู้ IP ของบอร์ด (IP หอเปลี่ยนบ่อย)
   static bool wifiWasUp = false;
   bool wifiUp = WiFi.status() == WL_CONNECTED;
   if (wifiUp != wifiWasUp)
@@ -977,11 +995,11 @@ void loop()
 
   if (WiFi.status() == WL_CONNECTED && !mdnsUp)
   {
-    if (MDNS.begin("plantpot"))
+    if (MDNS.begin(netHostname.c_str()))
     {
       MDNS.addService("http", "tcp", 80);
-      MDNS.enableArduino(3232, true); // ให้ Arduino IDE เห็นพอร์ตเครือข่าย "plantpot" (ต้องใส่รหัส)
-      Serial.println("[mdns] http://plantpot.local ready");
+      MDNS.enableArduino(3232, true); // ให้ Arduino IDE เห็นพอร์ตเครือข่ายชื่อเดียวกัน (ต้องใส่รหัส)
+      evlog("[mdns] http://%s.local ready", netHostname.c_str());
     }
     mdnsUp = true;
   }

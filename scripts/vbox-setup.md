@@ -154,7 +154,7 @@ sudo tailscale funnel --bg --tls-terminated-tcp=8443 tcp://localhost:1883
 ```
 1. **`.env` บน VM** → `FRONTEND_URL` และ `STRAVA_REDIRECT_URI` เป็น `https://plantvm.<tailnet>.ts.net...` แล้ว `sudo systemctl restart plant-backend`
 2. **Strava** → https://www.strava.com/settings/api → Authorization Callback Domain = `plantvm.<tailnet>.ts.net` (**ใส่ได้โดเมนเดียว** — สลับกลับ Pi ต้องแก้คืน)
-3. **ESP32** → `http://plantpot.local` → ช่อง Server URL = `https://plantvm.<tailnet>.ts.net` → บันทึก (ไม่ต้อง flash / ไม่ต้องเปลี่ยน token)
+3. **ESP32** → `http://plantpot-<deviceid>.local` (เช่น `plantpot-pot-001.local` · firmware รุ่นเก่าใช้ `plantpot.local`) → ช่อง Server URL = `https://plantvm.<tailnet>.ts.net` → บันทึก (ไม่ต้อง flash / ไม่ต้องเปลี่ยน token)
 
 > **ใช้งานจริงได้ทีละเครื่อง** — ฐานข้อมูลของ VM กับ Pi แยกกัน ทุกครั้งที่สลับ: dump จากเครื่องที่ใช้อยู่ → import เข้าอีกเครื่อง → ค่อยเปลี่ยน 3 จุดข้างบน
 > เครื่อง `respi` ใน Tailscale ใช้สำรองได้เฉพาะถ้า SD card ของ Pi ไม่เสีย (ตัวตนของเครื่องเก็บอยู่บน SD) — ถ้าต้อง flash SD ใหม่ ให้ลบ `respi` เก่าแล้วตั้งชื่อเดิมให้ Pi ตัวใหม่
@@ -202,7 +202,7 @@ Control Panel → Power Options → **Choose what closing the lid does** → Whe
 | `@prisma/client did not initialize yet` | pnpm ไม่ได้ generate — ตรวจ `pnpm -v` เป็น 10.x แล้ว `cd backend && pnpm exec prisma generate` |
 | `Access denied` ตอน import dump | MySQL ยังเริ่มไม่เสร็จ รอ 30 วิแล้วลองใหม่ (`docker logs plant_mysql_db`) |
 | URL กลายเป็น `respi-1.<tailnet>.ts.net` | ลืมลบเครื่อง `respi` เก่าก่อน `tailscale up` → ลบเครื่องเก่า แล้ว `sudo tailscale set --hostname=respi` |
-| ESP32 ไม่ต่อ (`journalctl` เงียบ) | `tailscale funnel status` ต้องมี `:8443` · เปิด `http://plantpot.local/log` ดูว่า `connect failed state=` เท่าไร (`-2` = ต่อพอร์ตไม่ได้, `4` = token ผิด) |
+| ESP32 ไม่ต่อ (`journalctl` เงียบ) | `tailscale funnel status` ต้องมี `:8443` · เปิด `http://plantpot-<deviceid>.local/log` ดูว่า `connect failed state=` เท่าไร (`-2` = ต่อพอร์ตไม่ได้, `4` = token ผิด) |
 | เว็บหลุดตอนปิดฝาโน้ตบุ๊ก | ยังไม่ได้ตั้ง Lid → Do nothing (ขั้นที่ 10) |
 
 ## ย้ายกลับไป Raspberry Pi (เมื่อซ่อมเสร็จ)

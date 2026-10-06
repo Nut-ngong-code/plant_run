@@ -23,9 +23,10 @@ code/
 - **Frontend**: Vite 5 (proxy `/api` + `/health` → :3000), React Router (lazy routes), Axios → :5173
 - **Hardware**: ESP32 + Relay + ปั๊มน้ำ + Solenoid Valve + Soil Moisture Sensor
 - **Firmware**: `firmware/esp32_v-1/` (MQTT — ต้องลง lib **PubSubClient**) · `firmware/esp32_polling/` (รุ่นสำรอง HTTP polling ทุก 5 วิ)
-  - **อัปเดตผ่าน Wi-Fi (OTA)** — รหัส = Device Token · (A) Arduino IDE → Port `plantpot at 192.168.x.x` → Upload · (B) Sketch → Export Compiled Binary → `http://plantpot.local/update` (user `plantpot`)
+  - **อัปเดตผ่าน Wi-Fi (OTA)** — รหัส = Device Token · (A) Arduino IDE → Port `plantpot-pot-001 at 192.168.x.x` → Upload · (B) Sketch → Export Compiled Binary → `http://plantpot-pot-001.local/update` (user `plantpot`)
   - **Partition Scheme ต้องเป็น "Default 4MB with spiffs"** (มี 2 ช่อง app) — ถ้าเลือก "Huge APP (no OTA)" จะอัปเดตผ่าน Wi-Fi ไม่ได้
-  - ดูเหตุการณ์ย้อนหลัง + สาเหตุการรีเซ็ต: `http://plantpot.local/log`
+  - ดูเหตุการณ์ย้อนหลัง + สาเหตุการรีเซ็ต: `http://plantpot-pot-001.local/log`
+  - **ชื่อในเครือข่ายตั้งตาม Device ID** — `POT-001` → `plantpot-pot-001.local` / พอร์ต OTA `plantpot-pot-001` · หลายกระถางในบ้านเดียวกันจึงไม่ชนกัน (ชื่อนี้โชว์ในหน้าเราเตอร์ด้วย) · firmware ก่อน 2026-10-06 ใช้ `plantpot.local` ทุกตัว
 
 ## Quick Start
 
