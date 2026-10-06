@@ -46,7 +46,9 @@ const int RAW_WET = 1400; // raw ตอนจุ่มน้ำ -> 100%
 const int AUTO_WATER_ON_PCT = 10;              // เริ่มรดเมื่อ < นี้ (very dry)
 const int AUTO_WATER_OFF_PCT = 25;             // หยุดเมื่อ > นี้ (กลับสู่ dry zone)
 const unsigned long AUTO_WATER_MAX_MS = 60000; // safety cap — เปิดต่อเนื่องเกินนี้ = sensor น่าจะพัง
-const unsigned long FERT_DURATION_MS = 5000;   // ปุ่มปุ๋ย local = 5 วิ
+const unsigned long FERT_DURATION_MS = 5000;   // DEV API /fertilizer = 5 วิ
+const unsigned long DEV_WATER_DEFAULT_S = 10;  // DEV API /on ไม่ระบุ sec = 10 วิ
+const unsigned long DEV_WATER_MAX_S = 60;      // เพดานเดียวกับ AUTO_WATER_MAX_MS
 const unsigned long SENSOR_POST_MS = 300000;   // ส่งความชื้นทุก 5 นาที
 const unsigned long WIFI_RETRY_MS = 30000;     // ลอง reconnect Wi-Fi ทุก 30 วิ เมื่อหลุด (ไม่ค้าง offline)
 
@@ -78,7 +80,8 @@ String makeHostname(const String &id)
 
 bool isFertilizing = false;
 unsigned long fertStartTime = 0;
-bool isManualWater = false;
+bool isManualWater = false;       // โหมดทดสอบ (DEV API /on) — ไม่มีปุ่มบนหน้าเว็บ
+unsigned long manualWaterUntil = 0; // ตัดน้ำเองเมื่อถึงเวลานี้ กันลืมเรียก /off
 
 bool autoWaterActive = false;
 unsigned long autoWaterStartedAt = 0;
@@ -608,6 +611,20 @@ String mqttChip()
   return "<span class=\"chip warn\"><i></i>กำลังเชื่อมต่อ</span>";
 }
 
+// ตอนนี้ปั๊ม/วาล์วกำลังทำอะไร — ตามลำดับความสำคัญเดียวกับใน loop
+String activityChip()
+{
+  if (isCloudActive)
+    return "<span class=\"chip ok\"><i></i>กำลังทำคำสั่งจากเว็บ (" + htmlEscape(cloudType) + ")</span>";
+  if (isFertilizing)
+    return "<span class=\"chip warn\"><i></i>DEV · จ่ายปุ๋ยทดสอบ</span>";
+  if (isManualWater)
+    return "<span class=\"chip warn\"><i></i>DEV · เปิดน้ำทดสอบ</span>";
+  if (autoWaterActive)
+    return "<span class=\"chip ok\"><i></i>ออโต้กำลังรดน้ำ</span>";
+  return "<span class=\"chip\"><i></i>ออโต้ทำงานปกติ</span>";
+}
+
 // หน้าข้อความสั้น (บันทึกแล้ว / กรอกผิด / กำลังรีสตาร์ท) — การ์ดเดียวกลางจอ
 void sendNotice(int code, const String &title, const String &msg, const String &href, const String &label)
 {
@@ -759,22 +776,13 @@ void handleRoot()
   html += "\"/></svg><div class=\"v\"><div class=\"big\"><span id=\"pct\">";
   html += String(pct);
   html += "</span><small>%</small></div><div class=\"eye\" style=\"margin:8px 0 0\">SOIL MOISTURE</div></div></div>"
-          "<p class=\"mut\">ออโต้ — รดน้ำเมื่อต่ำกว่า ";
+          "<div style=\"margin:0 0 10px\">";
+  html += activityChip();
+  html += "</div><p class=\"mut\">ออโต้ — รดน้ำเมื่อต่ำกว่า ";
   html += String(AUTO_WATER_ON_PCT);
   html += "% · หยุดเมื่อเกิน ";
   html += String(AUTO_WATER_OFF_PCT);
   html += "%</p></div>";
-
-  // ควบคุมด้วยมือ
-  html += "<div class=\"card\"><p class=\"eye\">MANUAL CONTROL</p><div style=\"margin:0 0 14px\">";
-  if (isCloudActive)
-    html += "<span class=\"chip ok\"><i></i>กำลังทำคำสั่งจากเว็บ (" + htmlEscape(cloudType) + ")</span>";
-  else if (isManualWater)
-    html += "<span class=\"chip warn\"><i></i>เปิดน้ำค้างไว้ · ออโต้หยุดชั่วคราว</span>";
-  else
-    html += "<span class=\"chip\"><i></i>ออโต้ทำงานปกติ</span>";
-  html += "</div><div class=\"row\"><a class=\"btn water\" href=\"/on\">💧 เปิดน้ำ</a><a class=\"btn out\" href=\"/off\">ปิด · กลับออโต้</a></div>"
-          "<button class=\"btn sun\" style=\"margin-top:10px\" onclick=\"fert(this)\">🌿 จ่ายปุ๋ย 5 วินาที</button></div>";
 
   // ตั้งค่า — เรียงตามที่ใช้บ่อย: Token → Server URL → ล้างทั้งหมด
   html += "<div class=\"card\" id=\"settings\"><p class=\"eye\">SETTINGS</p>";
@@ -803,41 +811,17 @@ void handleRoot()
   html += "</div><script>"
           "var C=490.1;setInterval(function(){fetch('/moisture').then(function(r){return r.json()}).then(function(d){"
           "document.getElementById('pct').textContent=d.pct;document.getElementById('arc').style.strokeDashoffset=(C*(100-d.pct)/100).toFixed(1)})},3000);"
-          "function fert(b){b.disabled=true;b.textContent='กำลังจ่ายปุ๋ย…';fetch('/fertilizer').then(function(){setTimeout(function(){"
-          "b.textContent='✓ จ่ายปุ๋ยแล้ว';setTimeout(function(){b.disabled=false;b.textContent='🌿 จ่ายปุ๋ย 5 วินาที'},2500)},5000)})}"
           "</script>";
   html += PAGE_END;
   server.send(200, "text/html; charset=utf-8", html);
 }
 
-void handleOn()
-{
-  isManualWater = true;
-  server.sendHeader("Location", "/");
-  server.send(303);
-}
-void handleOff()
-{
-  isManualWater = false;
-  server.sendHeader("Location", "/");
-  server.send(303);
-}
 // หน้าเว็บบอร์ดดึงทุก 3 วิ — pct = ค่าเดียวกับที่ส่งขึ้นเว็บหลัก · raw = ค่า ADC ไว้ calibrate
 void handleMoisture()
 {
   server.send(200, "application/json", String("{\"pct\":") + readMoisturePercent() + ",\"raw\":" + analogRead(sensorPin) + "}");
 }
 
-void handleFertilizer()
-{
-  if (!isFertilizing)
-  {
-    isFertilizing = true;
-    fertStartTime = millis();
-    openFertilizerValve();
-  }
-  server.send(200, "text/plain", "OK");
-}
 
 // หน้าดูเหตุการณ์ย้อนหลัง — ใช้วิเคราะห์ตอนบอร์ดหลุดโดยไม่ต้องต่อ USB/Serial Monitor
 void handleLog()
@@ -1052,6 +1036,104 @@ void handleUpdateDone()
   }
 }
 
+// ===== 11c. DEV API — ทดสอบปั๊ม/วาล์วด้วย Postman (ไม่มีปุ่มบนหน้าเว็บ ผู้ใช้จะได้ไม่รดน้ำฟรีข้ามระบบแต้ม) =====
+// ต้อง POST + Basic Auth (user: plantpot / รหัส: Device Token) — คู่มือ + Postman collection: firmware/esp32_v-1/DEV-API.md
+// คำสั่งจากเว็บ (MQTT) สำคัญกว่าเสมอ — ระหว่างนั้น DEV ถูกพักไว้ตามลำดับใน loop
+bool devAuth()
+{
+  if (server.authenticate(OTA_USER, cfgToken.c_str()))
+    return true;
+  server.requestAuthentication(BASIC_AUTH, "plantpot", "{\"ok\":false,\"error\":\"unauthorized\"}");
+  return false;
+}
+
+const char *activityName()
+{
+  if (isCloudActive)
+    return "cloud";
+  if (isFertilizing)
+    return "dev-fertilizer";
+  if (isManualWater)
+    return "dev-water";
+  if (autoWaterActive)
+    return "auto-water";
+  return "idle";
+}
+
+// คำสั่งจากเว็บ (ผู้ใช้จ่ายแต้มแล้ว) กำลังทำงาน → ไม่ให้ DEV ไปสับวาล์ว/ตัดน้ำกลางคัน
+bool devBusy()
+{
+  if (!isCloudActive)
+    return false;
+  server.send(409, "application/json", "{\"ok\":false,\"error\":\"busy: กำลังทำคำสั่งจากเว็บ ลองใหม่อีกครั้ง\",\"activity\":\"cloud\"}");
+  return true;
+}
+
+void devReply(const String &extra)
+{
+  server.send(200, "application/json",
+              String("{\"ok\":true,\"activity\":\"") + activityName() + "\"" + extra + "}");
+}
+
+// POST /on?sec=10 — เปิดน้ำ sec วินาที (1–60, ไม่ระบุ = 10) แล้วปิดเอง
+void handleDevWaterOn()
+{
+  if (!devAuth() || devBusy())
+    return;
+  long sec = server.hasArg("sec") ? server.arg("sec").toInt() : (long)DEV_WATER_DEFAULT_S;
+  if (sec < 1 || sec > (long)DEV_WATER_MAX_S)
+  {
+    server.send(400, "application/json", String("{\"ok\":false,\"error\":\"sec ต้องอยู่ระหว่าง 1-") + DEV_WATER_MAX_S + "\"}");
+    return;
+  }
+  isManualWater = true;
+  manualWaterUntil = millis() + (unsigned long)sec * 1000UL;
+  evlog("[dev] water on %lds", sec);
+  devReply(String(",\"sec\":") + sec);
+}
+
+// POST /off — ปิดน้ำ/ปุ๋ยทดสอบทันที (ไม่แตะคำสั่งจากเว็บ)
+void handleDevOff()
+{
+  if (!devAuth() || devBusy())
+    return;
+  bool was = isManualWater || isFertilizing;
+  isManualWater = false;
+  isFertilizing = false;
+  if (was)
+  {
+    closeAll();
+    evlog("[dev] off");
+  }
+  devReply("");
+}
+
+// POST /fertilizer — เปิดวาล์วปุ๋ย 5 วิ
+void handleDevFertilizer()
+{
+  if (!devAuth() || devBusy())
+    return;
+  if (!isFertilizing)
+  {
+    isFertilizing = true;
+    fertStartTime = millis();
+    openFertilizerValve();
+    evlog("[dev] fertilizer %lus", FERT_DURATION_MS / 1000);
+  }
+  devReply(String(",\"sec\":") + (FERT_DURATION_MS / 1000));
+}
+
+// GET /status — อ่านอย่างเดียว ไม่ต้องใส่รหัส (ไว้เช็คผลหลังยิงคำสั่ง)
+void handleStatus()
+{
+  String j = String("{\"deviceId\":\"") + cfgDeviceId + "\",\"host\":\"" + netHostname + ".local\",\"ip\":\"" +
+             WiFi.localIP().toString() + "\",\"moisture\":{\"pct\":" + readMoisturePercent() + ",\"raw\":" + analogRead(sensorPin) +
+             "},\"activity\":\"" + activityName() + "\",\"mqtt\":\"" +
+             (mqtt.connected() ? "connected" : (mqttAuthFailed ? "auth_failed" : "connecting")) +
+             "\",\"uptimeSec\":" + (millis() / 1000) + "}";
+  server.send(200, "application/json", j);
+}
+
 // ===== 12. Setup / Loop =====
 void setup()
 {
@@ -1100,10 +1182,11 @@ void setup()
   Serial.printf("Cloud target -> %s (MQTT %s:%u)\n", cfgApiBase.c_str(), mqttHost.c_str(), mqttPort);
 
   server.on("/", handleRoot);
-  server.on("/on", handleOn);
-  server.on("/off", handleOff);
+  server.on("/on", HTTP_POST, handleDevWaterOn); // DEV API — ดู DEV-API.md
+  server.on("/off", HTTP_POST, handleDevOff);
   server.on("/moisture", handleMoisture);
-  server.on("/fertilizer", handleFertilizer);
+  server.on("/fertilizer", HTTP_POST, handleDevFertilizer);
+  server.on("/status", HTTP_GET, handleStatus);
   server.on("/setapi", HTTP_POST, handleSetApi);
   server.on("/settoken", HTTP_POST, handleSetToken);
   server.on("/reset", handleReset);
@@ -1185,7 +1268,7 @@ void loop()
     btnDownAt = 0;
   }
 
-  // --- ตัดสินใจสถานะ valve+ปั๊ม (priority: cloud > local-fert > local-manual > auto) ---
+  // --- ตัดสินใจสถานะ valve+ปั๊ม (priority: cloud > dev-fert > dev-water > auto) ---
   if (isCloudActive)
   {
     if (now - cloudStart >= cloudDurationMs)
@@ -1208,7 +1291,14 @@ void loop()
   }
   else if (isManualWater)
   {
-    openWaterValve();
+    if ((long)(now - manualWaterUntil) >= 0)
+    {
+      isManualWater = false;
+      closeAll();
+      evlog("[dev] water off (หมดเวลา)");
+    }
+    else
+      openWaterValve();
   }
   else
   {

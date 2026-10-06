@@ -1,0 +1,297 @@
+{
+  "info": {
+    "name": "Plant Pot — DEV",
+    "description": "ทดสอบบอร์ด ESP32 ตรง ๆ (Board) และทั้งลูปผ่าน backend (Backend)\nคู่มือ: firmware/esp32_v-1/DEV-API.md\nตั้งค่าตัวแปรของ collection ก่อน: board, token, server, userId, deviceId",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "board",
+      "value": "http://plantpot-pot-001.local",
+      "description": "ที่อยู่บอร์ด — .local ไม่ขึ้นให้ใช้ http://<IP>"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "description": "Device Token ของบอร์ดตัวนั้น (รหัส Basic Auth)"
+    },
+    {
+      "key": "server",
+      "value": "https://plantvm.tailbfad61.ts.net",
+      "description": "backend (Funnel)"
+    },
+    {
+      "key": "userId",
+      "value": "1"
+    },
+    {
+      "key": "deviceId",
+      "value": "POT-001"
+    }
+  ],
+  "item": [
+    {
+      "name": "Board (ESP32 ตรง · ไม่หักแต้ม)",
+      "auth": {
+        "type": "basic",
+        "basic": [
+          {
+            "key": "username",
+            "value": "plantpot",
+            "type": "string"
+          },
+          {
+            "key": "password",
+            "value": "{{token}}",
+            "type": "string"
+          }
+        ]
+      },
+      "item": [
+        {
+          "name": "Status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{board}}/status",
+              "host": [
+                "{{board}}"
+              ],
+              "path": [
+                "status"
+              ]
+            },
+            "description": "อ่านอย่างเดียว ไม่ต้องใส่รหัส",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Water on (sec)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{board}}/on?sec=10",
+              "host": [
+                "{{board}}"
+              ],
+              "path": [
+                "on"
+              ],
+              "query": [
+                {
+                  "key": "sec",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "เปิดน้ำ sec วินาที (1-60) แล้วปิดเอง · 409 = กำลังทำคำสั่งจากเว็บ"
+          },
+          "response": []
+        },
+        {
+          "name": "Fertilizer 5s",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{board}}/fertilizer",
+              "host": [
+                "{{board}}"
+              ],
+              "path": [
+                "fertilizer"
+              ]
+            },
+            "description": "เปิดวาล์วปุ๋ย 5 วินาที"
+          },
+          "response": []
+        },
+        {
+          "name": "Off",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{board}}/off",
+              "host": [
+                "{{board}}"
+              ],
+              "path": [
+                "off"
+              ]
+            },
+            "description": "หยุดน้ำ/ปุ๋ยทดสอบทันที"
+          },
+          "response": []
+        },
+        {
+          "name": "Moisture",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{board}}/moisture",
+              "host": [
+                "{{board}}"
+              ],
+              "path": [
+                "moisture"
+              ]
+            },
+            "description": "{pct, raw} — raw ใช้ calibrate",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Log (text)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{board}}/log?txt=1",
+              "host": [
+                "{{board}}"
+              ],
+              "path": [
+                "log"
+              ],
+              "query": [
+                {
+                  "key": "txt",
+                  "value": "1"
+                }
+              ]
+            },
+            "description": "เหตุการณ์ล่าสุด 30 รายการ",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Backend (ทั้งลูปจริง · หักแต้ม)",
+      "item": [
+        {
+          "name": "Dashboard",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{server}}/api/user/{{userId}}/dashboard",
+              "host": [
+                "{{server}}"
+              ],
+              "path": [
+                "api",
+                "user",
+                "{{userId}}",
+                "dashboard"
+              ]
+            },
+            "description": "แต้ม + กระถาง (isOnline, localIp, ความชื้นล่าสุด)"
+          },
+          "response": []
+        },
+        {
+          "name": "Water via MQTT",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{server}}/api/action",
+              "host": [
+                "{{server}}"
+              ],
+              "path": [
+                "api",
+                "action"
+              ]
+            },
+            "description": "เหมือนกดปุ่ม WATER (-15 แต้ม)",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": {{userId}},\n  \"deviceId\": \"{{deviceId}}\",\n  \"actionType\": \"water\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Fertilizer via MQTT",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{server}}/api/action",
+              "host": [
+                "{{server}}"
+              ],
+              "path": [
+                "api",
+                "action"
+              ]
+            },
+            "description": "เหมือนกดปุ่ม FERTILIZE (-20 แต้ม)",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": {{userId}},\n  \"deviceId\": \"{{deviceId}}\",\n  \"actionType\": \"fertilizer\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Sync Strava",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{server}}/api/auth/strava/sync/{{userId}}",
+              "host": [
+                "{{server}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "strava",
+                "sync",
+                "{{userId}}"
+              ]
+            },
+            "description": "ดึงการวิ่งใหม่ → เพิ่มแต้ม"
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
