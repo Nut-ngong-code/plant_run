@@ -10,7 +10,9 @@
     "postinstall": "prisma generate",
     "prisma:generate": "prisma generate",
     "prisma:pull": "prisma db pull",
-    "prisma:studio": "prisma studio"
+    "prisma:studio": "prisma studio",
+    "test": "vitest run --coverage",
+    "test:watch": "vitest"
   },
   "keywords": [],
   "author": "",
@@ -20,13 +22,17 @@
     "onlyBuiltDependencies": [
       "@prisma/client",
       "@prisma/engines",
+      "esbuild",
       "prisma"
     ]
   },
   "devDependencies": {
+    "@vitest/coverage-v8": "^3.2.7",
     "dotenv": "^17.4.2",
     "prisma": "^6.19.3",
-    "tsx": "^4.21.0"
+    "supertest": "^7.3.1",
+    "tsx": "^4.21.0",
+    "vitest": "^3.2.7"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",

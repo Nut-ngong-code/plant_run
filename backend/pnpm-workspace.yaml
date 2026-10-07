@@ -10,3 +10,4 @@ onlyBuiltDependencies:
   - '@prisma/client'
   - '@prisma/engines'
   - prisma
+  - esbuild   # vitest → vite ใช้ (มีแค่สคริปต์ตรวจไฟล์ binary)

@@ -6,6 +6,7 @@ dist/
 dist-ssr/
 build/
 .vite/
+coverage/
 
 # Environment & secrets — NEVER commit
 .env
