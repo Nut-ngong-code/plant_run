@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Plant Pot — DEV",
-    "description": "ทดสอบบอร์ด ESP32 ตรง ๆ (Board) และทั้งลูปผ่าน backend (Backend)\nคู่มือ: firmware/esp32_v-1/DEV-API.md\nตั้งค่าตัวแปรของ collection ก่อน: board, token, server, userId, deviceId",
+    "description": "ทดสอบบอร์ด ESP32 ตรง ๆ (Board) และทั้งลูปผ่าน backend (Backend)\nคู่มือ: firmware/esp32_v-1/DEV-API.md\nตั้งค่าตัวแปรของ collection ก่อน: board, token, server, session, userId, deviceId",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -27,6 +27,11 @@
     {
       "key": "deviceId",
       "value": "POT-001"
+    },
+    {
+      "key": "session",
+      "value": "",
+      "description": "ค่า cookie plant_sid จากเบราว์เซอร์ (DevTools → Application → Cookies) — ใช้กับโฟลเดอร์ Backend"
     }
   ],
   "item": [
@@ -186,7 +191,12 @@
           "name": "Dashboard",
           "request": {
             "method": "GET",
-            "header": [],
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "plant_sid={{session}}"
+              }
+            ],
             "url": {
               "raw": "{{server}}/api/user/{{userId}}/dashboard",
               "host": [
@@ -211,6 +221,10 @@
               {
                 "key": "Content-Type",
                 "value": "application/json"
+              },
+              {
+                "key": "Cookie",
+                "value": "plant_sid={{session}}"
               }
             ],
             "url": {
@@ -226,7 +240,7 @@
             "description": "เหมือนกดปุ่ม WATER (-15 แต้ม)",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"userId\": {{userId}},\n  \"deviceId\": \"{{deviceId}}\",\n  \"actionType\": \"water\"\n}",
+              "raw": "{\n  \"deviceId\": \"{{deviceId}}\",\n  \"actionType\": \"water\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -244,6 +258,10 @@
               {
                 "key": "Content-Type",
                 "value": "application/json"
+              },
+              {
+                "key": "Cookie",
+                "value": "plant_sid={{session}}"
               }
             ],
             "url": {
@@ -259,7 +277,7 @@
             "description": "เหมือนกดปุ่ม FERTILIZE (-20 แต้ม)",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"userId\": {{userId}},\n  \"deviceId\": \"{{deviceId}}\",\n  \"actionType\": \"fertilizer\"\n}",
+              "raw": "{\n  \"deviceId\": \"{{deviceId}}\",\n  \"actionType\": \"fertilizer\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -273,7 +291,12 @@
           "name": "Sync Strava",
           "request": {
             "method": "POST",
-            "header": [],
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "plant_sid={{session}}"
+              }
+            ],
             "url": {
               "raw": "{{server}}/api/auth/strava/sync/{{userId}}",
               "host": [
@@ -291,7 +314,8 @@
           },
           "response": []
         }
-      ]
+      ],
+      "description": "ต้องมี session cookie: ใส่ตัวแปร session = ค่า plant_sid จากเบราว์เซอร์ที่ login แล้ว · userId ต้องเป็นของคนเดียวกับ cookie ไม่งั้น 403"
     }
   ]
 }

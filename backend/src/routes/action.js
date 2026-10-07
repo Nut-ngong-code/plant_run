@@ -5,11 +5,12 @@ import { prisma } from "../lib/prisma.js";
 import { actionCost } from "../lib/config.js";
 import { HttpError } from "../middleware/error.js";
 import { dispatchNext } from "../lib/mqtt.js";
+import { requireUser } from "../middleware/userAuth.js";
 
 export const actionRouter = Router();
 
+// userId มาจาก session (requireUser) — ถ้า body ส่ง userId มาด้วยจะถูกตัดทิ้ง (zod object ไม่เก็บ key ที่ไม่ได้ประกาศ)
 const postBody = z.object({
-  userId: z.number().int().positive(),
   deviceId: z.string().min(1), // MAC-style string (UK ใน DEVICE.device_id)
   actionType: z.enum(["water", "fertilizer"]),
   durationSeconds: z.number().int().positive().max(120).optional(),
@@ -18,8 +19,9 @@ const postBody = z.object({
 // POST /api/action
 // รับคำสั่งจากเว็บ → ตรวจแต้ม → หักแต้ม → สร้าง ACTION_LOG (pending)
 // ใช้ prisma.$transaction เพื่อกัน race condition กรณีผู้ใช้กดรัว (interactive tx + SELECT FOR UPDATE)
-actionRouter.post("/", async (req, res) => {
-  const { userId, deviceId, actionType, durationSeconds } = postBody.parse(req.body);
+actionRouter.post("/", requireUser, async (req, res) => {
+  const userId = req.userId;
+  const { deviceId, actionType, durationSeconds } = postBody.parse(req.body);
   const cost = actionCost[actionType];
 
   const device = await prisma.device.findUnique({ where: { deviceId } });

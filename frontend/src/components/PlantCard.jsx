@@ -5,7 +5,7 @@ import { rotateDeviceToken, deleteDevice } from "../api/endpoints.js";
 
 const COST = { water: 15, fertilizer: 20 };
 
-export function PlantCard({ device, totalPoints, onAction, onDelete, lastSyncedAt, userId }) {
+export function PlantCard({ device, totalPoints, onAction, onDelete, lastSyncedAt }) {
   const [busyType, setBusyType] = useState(null);
   const [errorMsg, setErrorMsg] = useState(null);
   // Overlay mode: idle | board | confirmRotate | rotating | issued | confirmDelete | deleting
@@ -32,7 +32,7 @@ export function PlantCard({ device, totalPoints, onAction, onDelete, lastSyncedA
     setMode("rotating");
     setErrorMsg(null);
     try {
-      const r = await rotateDeviceToken(userId, device.deviceId);
+      const r = await rotateDeviceToken(device.deviceId);
       setIssuedToken(r.deviceToken);
       setMode("issued");
     } catch (e) {
@@ -45,7 +45,7 @@ export function PlantCard({ device, totalPoints, onAction, onDelete, lastSyncedA
     setMode("deleting");
     setErrorMsg(null);
     try {
-      const r = await deleteDevice(userId, device.deviceId);
+      const r = await deleteDevice(device.deviceId);
       // refresh dashboard ผ่าน parent — การ์ดจะถูกถอดออกจาก list
       onDelete?.(device.deviceId, r);
     } catch (e) {

@@ -27,7 +27,6 @@ export function AddDevice() {
     setSubmitting(true);
     try {
       const resp = await registerDevice({
-        userId,
         deviceId: deviceId.trim(),
         displayName: displayName.trim() || undefined,
       });

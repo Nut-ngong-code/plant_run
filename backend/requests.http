@@ -9,6 +9,16 @@
 ### Health check
 GET {{host}}/health
 
+### --- LOGIN (ทุก API ของผู้ใช้ต้องมี session cookie) ---
+### เครื่อง dev: ตั้ง ALLOW_DEV_LOGIN=true ใน backend/.env แล้วยิงอันนี้ก่อน — REST Client เก็บ cookie plant_sid ให้เอง
+POST {{host}}/api/auth/dev-login
+Content-Type: application/json
+
+{ "userId": {{userId}} }
+
+### ตอนนี้ login เป็นใคร
+GET {{host}}/api/auth/me
+
 ### --- USER / DASHBOARD ---
 
 ### ดึงข้อมูล dashboard ผู้ใช้ (แต้ม, กระถาง, ความชื้นล่าสุด, สัปดาห์)
@@ -27,7 +37,6 @@ POST {{host}}/api/device
 Content-Type: application/json
 
 {
-  "userId": {{userId}},
   "deviceId": "{{deviceId}}",
   "displayName": "ต้นกระบองเพชร"
 }
@@ -60,7 +69,6 @@ POST {{host}}/api/action
 Content-Type: application/json
 
 {
-  "userId": {{userId}},
   "deviceId": "{{deviceId}}",
   "actionType": "water"
 }
@@ -70,7 +78,6 @@ POST {{host}}/api/action
 Content-Type: application/json
 
 {
-  "userId": {{userId}},
   "deviceId": "{{deviceId}}",
   "actionType": "fertilizer",
   "durationSeconds": 8

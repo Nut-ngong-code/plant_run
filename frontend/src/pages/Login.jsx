@@ -1,12 +1,23 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { setUserId } from "../lib/session.js";
+import { devLogin as devLoginApi, getAuthOptions } from "../api/endpoints.js";
 import { PlantGraphic } from "../components/PlantGraphic.jsx";
 import { GardenBackdrop } from "../components/GardenBackdrop.jsx";
 
 export function Login() {
   const navigate = useNavigate();
+  const [params] = useSearchParams();
   const [devId, setDevId] = useState("");
+  const [devEnabled, setDevEnabled] = useState(false); // backend เปิดให้เฉพาะ ALLOW_DEV_LOGIN=true
+  const [devError, setDevError] = useState(null);
+  const notice = params.get("error") === "session_expired" ? "หมดเวลาการเข้าสู่ระบบ — เชื่อม Strava อีกครั้ง" : null;
+
+  useEffect(() => {
+    getAuthOptions()
+      .then((o) => setDevEnabled(Boolean(o.devLogin)))
+      .catch(() => setDevEnabled(false));
+  }, []);
 
   const connectStrava = () => {
     // Forward the actual frontend origin so the backend can redirect back to
@@ -15,12 +26,17 @@ export function Login() {
     window.location.href = `/api/auth/strava/login?return_to=${returnTo}`;
   };
 
-  const devLogin = (e) => {
+  const devLogin = async (e) => {
     e.preventDefault();
     const n = Number(devId);
-    if (Number.isInteger(n) && n > 0) {
-      setUserId(n);
+    if (!Number.isInteger(n) || n <= 0) return;
+    setDevError(null);
+    try {
+      const me = await devLoginApi(n); // backend ออก session cookie ให้
+      setUserId(me.id);
       navigate("/");
+    } catch (err) {
+      setDevError(err.message);
     }
   };
 
@@ -51,6 +67,12 @@ export function Login() {
               <span className="text-forest-500">เริ่มต้นด้วยการเชื่อม Strava</span>
             </p>
 
+            {notice && (
+              <div className="mt-5 text-xs text-sun-600 bg-sun-50/80 border border-sun-200 rounded-lg px-3 py-2">
+                {notice}
+              </div>
+            )}
+
             <button
               onClick={connectStrava}
               className="btn-strava w-full mt-7 flex items-center justify-center gap-2.5"
@@ -59,6 +81,7 @@ export function Login() {
               <span>CONNECT WITH STRAVA</span>
             </button>
 
+            {devEnabled && (
             <div className="mt-7 pt-6 border-t border-white/70">
               <div className="label-eyebrow mb-2.5">DEV MODE — USER ID LOGIN</div>
               <form onSubmit={devLogin} className="flex flex-col xs:flex-row gap-2">
@@ -79,7 +102,9 @@ export function Login() {
                   ENTER
                 </button>
               </form>
+              {devError && <div className="mt-2 text-xs text-rose-700">{devError}</div>}
             </div>
+            )}
           </div>
         </div>
       </main>

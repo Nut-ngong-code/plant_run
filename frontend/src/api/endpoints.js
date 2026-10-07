@@ -12,11 +12,20 @@ export const sendAction = (payload) =>
 export const registerDevice = (payload) =>
   api.post(`/api/device`, payload).then((r) => r.data);
 
-export const rotateDeviceToken = (userId, deviceId) =>
-  api.post(`/api/device/${deviceId}/rotate-token`, { userId }).then((r) => r.data);
+// ผู้ใช้มาจาก session cookie — ไม่ต้องส่ง userId
+export const rotateDeviceToken = (deviceId) =>
+  api.post(`/api/device/${deviceId}/rotate-token`).then((r) => r.data);
 
-export const deleteDevice = (userId, deviceId) =>
-  api.delete(`/api/device/${deviceId}`, { data: { userId } }).then((r) => r.data);
+export const deleteDevice = (deviceId) =>
+  api.delete(`/api/device/${deviceId}`).then((r) => r.data);
+
+export const getMe = () => api.get(`/api/auth/me`).then((r) => r.data);
+
+export const getAuthOptions = () => api.get(`/api/auth/options`).then((r) => r.data);
+
+export const devLogin = (userId) => api.post(`/api/auth/dev-login`, { userId }).then((r) => r.data);
+
+export const logout = () => api.post(`/api/auth/logout`);
 
 export const syncStrava = (userId) =>
   api.post(`/api/auth/strava/sync/${userId}`, {}).then((r) => r.data);

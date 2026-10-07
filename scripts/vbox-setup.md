@@ -118,6 +118,7 @@ cp .env.pi.example .env && nano .env
 #   <TS_URL>               → respi.<tailnet>.ts.net  (ชื่อเดิม — ดูขั้นที่ 9)
 #   STRAVA_CLIENT_SECRET   → ค่าเดิมจาก .env บนโน้ตบุ๊ก
 #   MQTT_PORT=1883         → ต้องมี
+#   SESSION_SECRET         → ผลจาก `openssl rand -hex 32` (ใช้เซ็น cookie login) · ห้ามใส่ ALLOW_DEV_LOGIN บน server
 pnpm install                                  # postinstall รัน prisma generate ให้เอง
 
 cd ../frontend && pnpm install && pnpm run build

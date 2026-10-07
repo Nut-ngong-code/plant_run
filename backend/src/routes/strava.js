@@ -3,6 +3,8 @@ import { Router } from "express";
 import { prisma } from "../lib/prisma.js";
 import { config } from "../lib/config.js";
 import { HttpError } from "../middleware/error.js";
+import { requireUser, requireSelf } from "../middleware/userAuth.js";
+import { setSession } from "../lib/session.js";
 
 export const stravaRouter = Router();
 
@@ -111,21 +113,19 @@ stravaRouter.get("/callback", async (req, res) => {
     },
   });
 
-  // Redirect กลับไปที่ frontend พร้อม userId ใน query string
-  // (เวอร์ชัน prototype ไม่มี JWT — frontend เก็บ userId ใน localStorage)
+  // ออก session cookie (ลายเซ็น HMAC) แล้ว redirect กลับ frontend — ไม่ส่ง userId ใน URL อีก
+  // หน้าเว็บถามตัวเองว่าเป็นใครผ่าน GET /api/auth/me
   // ใช้ returnTo จาก state ถ้ามี (รับ port จริงจาก Vite) ไม่งั้น fallback เป็น FRONTEND_URL
+  setSession(res, user.id);
   const { returnTo } = decodeState(req.query.state);
   const base = safeReturnTo(returnTo) ?? config.frontendUrl;
-  const redirectUrl = new URL("/auth/callback", base);
-  redirectUrl.searchParams.set("userId", String(user.id));
-  res.redirect(redirectUrl.toString());
+  res.redirect(new URL("/auth/callback", base).toString());
 });
 
 // POST /api/auth/strava/sync/:userId
 // ดึง activities ล่าสุด -> อัปเดต RUN_HISTORY + เพิ่มแต้ม (distance_km * POINTS_PER_KM)
-stravaRouter.post("/sync/:userId", async (req, res) => {
-  const userId = Number(req.params.userId);
-  if (!Number.isInteger(userId)) throw new HttpError(400, "Invalid user id");
+stravaRouter.post("/sync/:userId", requireUser, requireSelf("userId"), async (req, res) => {
+  const userId = req.userId;
 
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user?.accessToken) throw new HttpError(400, "User not connected to Strava");

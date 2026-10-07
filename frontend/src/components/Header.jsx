@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import { clearUserId } from "../lib/session.js";
+import { logout as logoutApi } from "../api/endpoints.js";
 
 const links = [
   { to: "/", label: "DASHBOARD", end: true },
@@ -20,7 +21,8 @@ export function Header({ user }) {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  const logout = () => {
+  const logout = async () => {
+    await logoutApi().catch(() => {}); // ลบ session cookie ฝั่ง backend — พลาดก็ออกฝั่งหน้าเว็บต่อ
     clearUserId();
     navigate("/login");
   };

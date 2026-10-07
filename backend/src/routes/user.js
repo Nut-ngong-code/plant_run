@@ -3,6 +3,7 @@ import { Router } from "express";
 import { prisma } from "../lib/prisma.js";
 import { HttpError } from "../middleware/error.js";
 import { isDeviceOnline, getLocalIp } from "../lib/mqtt.js";
+import { requireUser, requireSelf } from "../middleware/userAuth.js";
 
 export const userRouter = Router();
 
@@ -12,9 +13,9 @@ export const userRouter = Router();
 //  - รายการอุปกรณ์ (กระถาง) พร้อมค่าความชื้นล่าสุดของแต่ละอัน
 //  - ระยะวิ่งในสัปดาห์ปัจจุบัน
 //  - ประวัติการกดรดน้ำล่าสุด
-userRouter.get("/:id/dashboard", async (req, res) => {
-  const userId = Number(req.params.id);
-  if (!Number.isInteger(userId)) throw new HttpError(400, "Invalid user id");
+// ทุกเส้นทางต้อง login และ :id ต้องเป็นตัวเอง (requireSelf) — ดูข้อมูลของคนอื่นไม่ได้
+userRouter.get("/:id/dashboard", requireUser, requireSelf("id"), async (req, res) => {
+  const userId = req.userId;
 
   const user = await prisma.user.findUnique({
     where: { id: userId },
@@ -81,9 +82,8 @@ userRouter.get("/:id/dashboard", async (req, res) => {
 });
 
 // GET /api/user/:id/history?type=run|action&limit=50
-userRouter.get("/:id/history", async (req, res) => {
-  const userId = Number(req.params.id);
-  if (!Number.isInteger(userId)) throw new HttpError(400, "Invalid user id");
+userRouter.get("/:id/history", requireUser, requireSelf("id"), async (req, res) => {
+  const userId = req.userId;
   const type = req.query.type ?? "run";
   const limit = Math.min(Number(req.query.limit ?? 50), 200);
 

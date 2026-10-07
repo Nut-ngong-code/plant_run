@@ -6,6 +6,7 @@ import { HttpError } from "../middleware/error.js";
 import { requireDeviceAuth, generateToken, hashToken } from "../middleware/deviceAuth.js";
 import { applyAck } from "../lib/commands.js";
 import { kickDevice } from "../lib/mqtt.js";
+import { requireUser } from "../middleware/userAuth.js";
 
 export const deviceRouter = Router();
 
@@ -59,12 +60,13 @@ deviceRouter.post("/:deviceId/command/:commandId/ack", requireDeviceAuth, async 
 
 // GET /api/device/:deviceId/soil-history?limit=200
 // ประวัติความชื้น สำหรับกราฟในหน้า stats
-deviceRouter.get("/:deviceId/soil-history", async (req, res) => {
+deviceRouter.get("/:deviceId/soil-history", requireUser, async (req, res) => {
   const { deviceId } = req.params;
   const limit = Math.min(Number(req.query.limit ?? 200), 1000);
 
   const device = await prisma.device.findUnique({ where: { deviceId } });
   if (!device) throw new HttpError(404, "Device not registered", { deviceId });
+  if (device.userId !== req.userId) throw new HttpError(403, "Device not owned by this user");
 
   const logs = await prisma.soilLog.findMany({
     where: { deviceId: device.id },
@@ -76,24 +78,18 @@ deviceRouter.get("/:deviceId/soil-history", async (req, res) => {
   res.json(logs.reverse()); // ส่งกลับเรียงตามเวลาน้อย → มาก (พร้อม plot)
 });
 
-// POST /api/device (สำหรับผูกอุปกรณ์กับผู้ใช้)
+// POST /api/device (สำหรับผูกอุปกรณ์กับผู้ใช้) — เจ้าของ = ผู้ใช้ใน session
 const registerBody = z.object({
-  userId: z.number().int().positive(),
   deviceId: z.string().min(1),
   displayName: z.string().optional(),
 });
 
 // POST /api/device/:deviceId/rotate-token
 // ออก token ใหม่ (one-time) สำหรับอุปกรณ์ที่มีอยู่ — invalidate ของเก่าทันที
-// Auth: prototype ตรวจแค่ userId ใน body ตรงกับ device.userId
-//       (เวอร์ชันมี user-session จริง ค่อยย้ายไป middleware)
-const rotateBody = z.object({
-  userId: z.number().int().positive(),
-});
-
-deviceRouter.post("/:deviceId/rotate-token", async (req, res) => {
+// Auth: ผู้ใช้ใน session ต้องเป็นเจ้าของ device
+deviceRouter.post("/:deviceId/rotate-token", requireUser, async (req, res) => {
   const { deviceId } = req.params;
-  const { userId } = rotateBody.parse(req.body);
+  const userId = req.userId;
 
   const device = await prisma.device.findUnique({ where: { deviceId } });
   if (!device) throw new HttpError(404, "Device not registered", { deviceId });
@@ -122,13 +118,9 @@ deviceRouter.post("/:deviceId/rotate-token", async (req, res) => {
 // DELETE /api/device/:deviceId
 // ลบกระถางออกจากระบบ — refund แต้มของ pending/executing actions ก่อนลบ
 // (foreign key cascade ลบ ACTION_LOG / SOIL_LOG / AUTO_SCHEDULE ของ device นี้ทิ้งหมด)
-const deleteBody = z.object({
-  userId: z.number().int().positive(),
-});
-
-deviceRouter.delete("/:deviceId", async (req, res) => {
+deviceRouter.delete("/:deviceId", requireUser, async (req, res) => {
   const { deviceId } = req.params;
-  const { userId } = deleteBody.parse(req.body);
+  const userId = req.userId;
 
   const device = await prisma.device.findUnique({ where: { deviceId } });
   if (!device) throw new HttpError(404, "Device not registered", { deviceId });
@@ -161,8 +153,15 @@ deviceRouter.delete("/:deviceId", async (req, res) => {
 
 // POST /api/device — ลงทะเบียน/ผูกอุปกรณ์ + ออก device token ใหม่ (one-time)
 // คืน plaintext token ใน response รอบนี้รอบเดียว — DB เก็บแค่ SHA-256 hash
-deviceRouter.post("/", async (req, res) => {
-  const data = registerBody.parse(req.body);
+deviceRouter.post("/", requireUser, async (req, res) => {
+  const data = { ...registerBody.parse(req.body), userId: req.userId };
+
+  // Device ID ที่เป็นของคนอื่นอยู่แล้ว ห้ามลงทะเบียนทับ — ไม่งั้นได้ token ใหม่ = ยึดกระถางคนอื่นได้
+  // เจ้าของเดิมลงทะเบียนซ้ำได้ (= ออก token ใหม่แบบเดียวกับ rotate)
+  const existing = await prisma.device.findUnique({ where: { deviceId: data.deviceId } });
+  if (existing && existing.userId !== req.userId) {
+    throw new HttpError(409, "Device ID นี้ถูกลงทะเบียนโดยผู้ใช้อื่นแล้ว", { deviceId: data.deviceId });
+  }
 
   const token = generateToken();
   const tokenHash = hashToken(token);

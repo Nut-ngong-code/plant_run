@@ -32,7 +32,7 @@ export function Dashboard() {
   }, [load]);
 
   const handleAction = async (deviceId, actionType) => {
-    const result = await sendAction({ userId, deviceId, actionType });
+    const result = await sendAction({ deviceId, actionType });
     setData((d) =>
       d ? { ...d, user: { ...d.user, totalPoints: result.remainingPoints } } : d,
     );
@@ -163,7 +163,6 @@ export function Dashboard() {
                   onAction={handleAction}
                   onDelete={handleDelete}
                   lastSyncedAt={d.latestMoisture?.recordedAt}
-                  userId={userId}
                 />
               ))}
             </div>

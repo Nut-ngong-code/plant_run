@@ -13,6 +13,7 @@ import { deviceRouter } from "./routes/device.js";
 import { userRouter } from "./routes/user.js";
 import { actionRouter } from "./routes/action.js";
 import { stravaRouter } from "./routes/strava.js";
+import { authRouter } from "./routes/auth.js";
 import { cleanupStaleCommands } from "./jobs/cleanupStale.js";
 import { startMqtt, dispatchNext } from "./lib/mqtt.js";
 
@@ -41,6 +42,7 @@ app.use("/api/device", deviceRouter);
 app.use("/api/user", userRouter);
 app.use("/api/action", actionRouter);
 app.use("/api/auth/strava", stravaRouter);
+app.use("/api/auth", authRouter);
 
 if (hasDist) {
   // ไฟล์ asset มี hash ในชื่ออยู่แล้ว → cache ยาวได้ ส่วน index.html ต้องสดเสมอ (จัดการด้านล่าง)
@@ -96,7 +98,7 @@ function renderIndex() {
     {
       title: "Device (ESP32)",
       routes: [
-        { m: "POST", path: "/api/device", desc: "ผูกอุปกรณ์กับผู้ใช้ { userId, deviceId, displayName }" },
+        { m: "POST", path: "/api/device", desc: "ผูกอุปกรณ์กับผู้ใช้ใน session { deviceId, displayName } · 🍪 ต้อง login" },
         { m: "GET", path: "/api/device/:deviceId/command", desc: "ESP32 poll คำสั่ง pending (สำรอง — firmware ปัจจุบันรับคำสั่งผ่าน MQTT)" },
         { m: "POST", path: "/api/device/:deviceId/command/:cmdId/ack", desc: "ESP32 แจ้งผลหลังรันคำสั่ง { status: success|failed }" },
       ],
@@ -119,7 +121,7 @@ function renderIndex() {
     {
       title: "Action (กดรดน้ำ/ปุ๋ย)",
       routes: [
-        { m: "POST", path: "/api/action", desc: "สั่งงาน { userId, deviceId, actionType: water|fertilizer, durationSeconds? }" },
+        { m: "POST", path: "/api/action", desc: "สั่งงาน { deviceId, actionType: water|fertilizer, durationSeconds? } · 🍪 ต้อง login" },
       ],
     },
     {
@@ -127,7 +129,10 @@ function renderIndex() {
       routes: [
         { m: "GET", path: "/api/auth/strava/login", desc: "เริ่ม OAuth flow (redirect ไป Strava)" },
         { m: "GET", path: "/api/auth/strava/callback", desc: "Strava callback (ไม่ต้องเรียกเอง)" },
-        { m: "POST", path: "/api/auth/strava/sync/:userId", desc: "ซิงก์กิจกรรมล่าสุด + เพิ่มแต้ม" },
+        { m: "POST", path: "/api/auth/strava/sync/:userId", desc: "ซิงก์กิจกรรมล่าสุด + เพิ่มแต้ม · 🍪 :userId ต้องเป็นตัวเอง" },
+        { m: "GET", path: "/api/auth/me", desc: "ผู้ใช้ใน session (cookie plant_sid) · ไม่มี = 401" },
+        { m: "POST", path: "/api/auth/logout", desc: "ลบ session cookie" },
+        { m: "POST", path: "/api/auth/dev-login", desc: "เข้าเป็น { userId } ไม่ผ่าน Strava — เฉพาะ ALLOW_DEV_LOGIN=true" },
       ],
     },
   ];

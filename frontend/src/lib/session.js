@@ -1,4 +1,5 @@
-// เก็บ userId ใน localStorage — เวอร์ชัน prototype ไม่ต้องใช้ JWT
+// สิทธิ์จริงอยู่ที่ cookie `plant_sid` (HttpOnly — JavaScript อ่านไม่ได้ backend เป็นคนตรวจ)
+// localStorage เก็บแค่ userId ไว้แสดงผล/ประกอบ URL ถ้าไม่ตรงกับ cookie backend จะตอบ 403
 const KEY = "plant.userId";
 
 export const getUserId = () => {

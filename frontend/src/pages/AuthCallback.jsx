@@ -1,26 +1,26 @@
 import { useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { setUserId } from "../lib/session.js";
+import { getMe } from "../api/endpoints.js";
 import { GardenBackdrop } from "../components/GardenBackdrop.jsx";
 
-// Backend redirect กลับมาพร้อม ?userId=xxx (หรือ ?error=...)
+// Backend ออก session cookie แล้ว redirect กลับมาที่นี่ (หรือ ?error=...) → ถามว่าเป็นใครจาก /api/auth/me
 export function AuthCallback() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
 
   useEffect(() => {
-    const userId = Number(params.get("userId"));
     const error = params.get("error");
     if (error) {
       navigate(`/login?error=${encodeURIComponent(error)}`, { replace: true });
       return;
     }
-    if (Number.isInteger(userId) && userId > 0) {
-      setUserId(userId);
-      navigate("/", { replace: true });
-    } else {
-      navigate("/login", { replace: true });
-    }
+    getMe()
+      .then((me) => {
+        setUserId(me.id);
+        navigate("/", { replace: true });
+      })
+      .catch(() => navigate("/login?error=login_failed", { replace: true }));
   }, [params, navigate]);
 
   return (

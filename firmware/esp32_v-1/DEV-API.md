@@ -60,6 +60,8 @@
 
 - **ไม่หักแต้ม ไม่บันทึก ACTION_LOG** — เป็นการสั่งฮาร์ดแวร์ตรง ๆ ใช้ทดสอบปั๊ม/วาล์ว/สายเท่านั้น
 - ถ้าต้องการทดสอบ **ทั้งลูปจริง** (หักแต้ม → MQTT → ack → คืนแต้มถ้าล้มเหลว) ใช้โฟลเดอร์ "Backend" ใน collection:
-  `POST {{server}}/api/action` body `{"userId":1,"deviceId":"POT-001","actionType":"water"}` — ตรงกับปุ่ม WATER บนเว็บ
+  `POST {{server}}/api/action` body `{"deviceId":"POT-001","actionType":"water"}` — ตรงกับปุ่ม WATER บนเว็บ
+  **ต้องมี session cookie** (ตั้งแต่ 2026-10-08 backend ไม่เชื่อ userId ใน body แล้ว): login ผ่านเว็บ → DevTools → Application → Cookies → คัดลอกค่า `plant_sid`
+  → ใส่ในตัวแปร `session` ของ collection (Postman ส่งเป็น header `Cookie: plant_sid={{session}}` ให้ทุก request ในโฟลเดอร์ Backend) · cookie หมดอายุใน 30 วัน / logout แล้วต้องคัดลอกใหม่
 - เปิดน้ำนานสุด 60 วิต่อคำสั่ง (เพดานเดียวกับ auto-water) กันน้ำล้นถ้าลืมเรียก `/off`
 - ใช้ HTTP ธรรมดาในวง LAN — รหัส (token) วิ่งแบบไม่เข้ารหัสภายใน Wi-Fi บ้าน เหมือนหน้า `/update`
