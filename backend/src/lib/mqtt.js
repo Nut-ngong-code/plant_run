@@ -234,7 +234,10 @@ async function dispatchOnce(deviceDbId) {
 export function isDeviceOnline(device, now = Date.now()) {
   if (connected.has(device.id)) return true;
   const lastSeen = device.lastSeenAt ? new Date(device.lastSeenAt).getTime() : 0;
-  if ((disconnectedAt.get(device.id) ?? 0) >= lastSeen) return false; // หลุดจาก MQTT หลังสัญญาณล่าสุด
+  // หลุดจาก MQTT หลังสัญญาณล่าสุด → offline ทันที
+  // +1 วิ: last_seen_at เป็น DATETIME(0) ที่ MySQL "ปัด" เศษวินาที — สัญญาณตอน .7 วิถูกเก็บเป็นวินาทีถัดไป
+  // ถ้าบอร์ดหลุดภายในเสี้ยววินาทีนั้น เวลาในฐานจะดูใหม่กว่าเวลาหลุด แล้วโชว์ online ต่ออีก 60 วิ (CI จับได้ 2026-10-08)
+  if ((disconnectedAt.get(device.id) ?? 0) + 1000 >= lastSeen) return false;
   return now - lastSeen < ONLINE_THRESHOLD_MS;
 }
 
