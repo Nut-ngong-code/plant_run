@@ -15,6 +15,10 @@ export default defineConfig({
       SESSION_SECRET: "test-only-secret",
       FRONTEND_URL: "http://localhost:5173",
       ALLOW_DEV_LOGIN: "false", // เทสว่าปิดจริง — ไม่สนว่า .env ของเครื่องเปิดไว้หรือไม่
+      // Strava ปลอม — เทสแค่ redirect / state ไม่ได้คุยกับ Strava จริง (ไม่ต้องพึ่ง .env ของเครื่อง)
+      STRAVA_CLIENT_ID: "test-client",
+      STRAVA_CLIENT_SECRET: "test-secret",
+      STRAVA_REDIRECT_URI: "http://localhost:3000/api/auth/strava/callback",
       ...fileEnv,
     },
     setupFiles: ["./test/setup.js"],
