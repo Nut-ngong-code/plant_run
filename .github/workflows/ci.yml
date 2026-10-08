@@ -1,5 +1,5 @@
 # CI — ทุกครั้งที่ push เข้า main หรือเปิด PR
-#   backend:  เปิด MySQL → โหลด database/init.sql ลงฐาน plant_test → เทส 48 ข้อ + coverage → ส่งผลให้ SonarCloud
+#   backend:  เปิด MySQL → โหลด database/init.sql ลงฐาน plant_test → ชุดทดสอบทั้งหมด + coverage → ส่งผลให้ SonarCloud
 #   frontend: build หน้าเว็บ (ถ้า build พัง จะรู้ก่อนเอาขึ้น VM)
 #   security: gitleaks สแกน secret ในประวัติ git ทั้งหมด · pnpm audit หา library ที่มีช่องโหว่
 # ไม่ได้ deploy อัตโนมัติ — ขึ้น VM ด้วยมือ (git pull → build → restart) ตามคู่มือ scripts/vbox-setup.md
