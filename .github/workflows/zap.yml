@@ -1,0 +1,41 @@
+# OWASP ZAP baseline — สแกนเว็บที่รันจริงจากภายนอก (DAST) แบบ passive: เดินตามลิงก์แล้วดู response
+# ไม่ได้โจมตีหรือส่งข้อมูลแปลก ๆ · สแกนเฉพาะเว็บของเราเอง (plantvm ผ่าน Tailscale Funnel)
+# รันเอง: แท็บ Actions → "ZAP baseline" → Run workflow (ใส่ชื่อรอบ เช่น before / after)
+# ผล: ดาวน์โหลด artifact zap-<รอบ> (report_html.html) · สรุปสั้นอยู่ใน annotation ของ job
+name: ZAP baseline
+
+on:
+  workflow_dispatch:
+    inputs:
+      label:
+        description: "ชื่อรอบสแกน (เช่น before / after)"
+        default: manual
+  push:
+    branches: [main]
+    paths: [".github/workflows/zap.yml"] # รันครั้งแรกตอนเพิ่ม/แก้ไฟล์นี้
+
+permissions:
+  contents: read
+
+jobs:
+  zap:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: ZAP baseline scan
+        uses: zaproxy/action-baseline@v0.14.0
+        with:
+          target: https://plantvm.tailbfad61.ts.net
+          allow_issue_writing: false # ไม่เปิด GitHub issue อัตโนมัติ
+          fail_action: false # ผลสแกนไม่ทำให้ workflow แดง — ดูจากรายงานแทน
+          artifact_name: zap-${{ inputs.label || 'push' }}
+
+      # สรุปทุก alert เป็น annotation เดียว (อ่านได้จากหน้า run โดยไม่ต้องดาวน์โหลด)
+      - name: Summary
+        if: always()
+        run: |
+          test -f report_json.json || { echo "::warning title=ZAP::no report_json.json"; exit 0; }
+          summary=$(jq -r '[.site[].alerts[]] | sort_by(-(.riskcode|tonumber)) | .[] | "\(.riskdesc) | \(.name) | \(.count) จุด"' report_json.json)
+          echo "$summary"
+          echo "::notice title=ZAP alerts::$(printf '%s' "$summary" | sed ':a;N;$!ba;s/\n/%0A/g')"
