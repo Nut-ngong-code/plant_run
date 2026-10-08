@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 
 import express from "express";
 import cors from "cors";
+import helmet from "helmet";
 
 import { config } from "./lib/config.js";
 import { errorHandler, notFound } from "./middleware/error.js";
@@ -27,6 +28,40 @@ const app = express();
 
 // ไม่บอกคนนอกว่าใช้ Express (header X-Powered-By) — ลดข้อมูลให้ผู้โจมตีเลือกช่องโหว่ตามเวอร์ชัน
 app.disable("x-powered-by");
+
+// Header ความปลอดภัยของเบราว์เซอร์ (helmet) — ผลจากสแกน OWASP ZAP 2026-10-08
+//   CSP: script โหลดได้จากเว็บเราเท่านั้น (build ไม่มี inline script) · style ยอม inline เพราะ <style> ใน index.html
+//        และ style ในตัวของกราฟ Recharts · ฟอนต์จาก Google Fonts · ห้ามเว็บอื่นฝังหน้าเราใน iframe (clickjacking)
+//   HSTS: บังคับ https หลังเข้าครั้งแรก (มีผลเฉพาะผ่าน Funnel — ตอน dev บน http เบราว์เซอร์ไม่สนใจ)
+//   ไม่เปิด COEP: ทำให้ฟอนต์/สไตล์จาก Google โหลดไม่ได้ และแอปไม่ได้ใช้ฟีเจอร์ที่ต้อง cross-origin isolation
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      useDefaults: false,
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+        fontSrc: ["'self'", "https://fonts.gstatic.com"],
+        imgSrc: ["'self'", "data:"],
+        connectSrc: ["'self'"],
+        objectSrc: ["'none'"],
+        baseUri: ["'self'"],
+        formAction: ["'self'"],
+        frameAncestors: ["'none'"],
+        // dev บน http://localhost ห้าม upgrade ไม่งั้นโหลด asset ไม่ได้
+        ...(config.cookieSecure ? { upgradeInsecureRequests: [] } : {}),
+      },
+    },
+    frameguard: { action: "deny" },
+    crossOriginEmbedderPolicy: false,
+  }),
+);
+// helmet ไม่ได้ตั้ง Permissions-Policy — เว็บนี้ไม่ใช้กล้อง/ไมค์/ตำแหน่ง/การชำระเงิน ปิดไว้ทั้งหมด
+app.use((_req, res, next) => {
+  res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=(), usb=()");
+  next();
+});
 
 // CORS: ให้เฉพาะหน้าเว็บของเราเรียก API ข้ามโดเมนได้ (เดิม cors() เปิดให้ทุกเว็บ)
 // ปกติหน้าเว็บกับ API อยู่โดเมนเดียวกันอยู่แล้ว (Funnel / Vite proxy) ส่วน ESP32 ไม่เกี่ยวกับ CORS
