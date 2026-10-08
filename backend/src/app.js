@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import path from "node:path";
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -30,29 +31,39 @@ const app = express();
 app.disable("x-powered-by");
 
 // Header ความปลอดภัยของเบราว์เซอร์ (helmet) — ผลจากสแกน OWASP ZAP 2026-10-08
-//   CSP: script โหลดได้จากเว็บเราเท่านั้น (build ไม่มี inline script) · style ยอม inline เพราะ <style> ใน index.html
-//        และ style ในตัวของกราฟ Recharts · ฟอนต์จาก Google Fonts · ห้ามเว็บอื่นฝังหน้าเราใน iframe (clickjacking)
+//   CSP: script โหลดได้จากเว็บเราเท่านั้น (build ไม่มี inline script) · ฟอนต์จาก Google Fonts
+//        ห้ามเว็บอื่นฝังหน้าเราใน iframe (clickjacking)
+//   style: ไม่ใช้ 'unsafe-inline' (ZAP รอบ after ยังเตือนข้อนี้ระดับ Medium) — อนุญาตเฉพาะ <style> ที่เขียนไว้เองในหน้า
+//        ผ่าน hash SHA-256 ของเนื้อหา ถ้ามีคนฉีด <style> อื่นเข้ามา hash จะไม่ตรงแล้วเบราว์เซอร์ไม่ใช้
+//        (style={{...}} ของ React และกราฟ Recharts ตั้งค่าผ่าน element.style ซึ่ง CSP ไม่บล็อก)
 //   HSTS: บังคับ https หลังเข้าครั้งแรก (มีผลเฉพาะผ่าน Funnel — ตอน dev บน http เบราว์เซอร์ไม่สนใจ)
 //   ไม่เปิด COEP: ทำให้ฟอนต์/สไตล์จาก Google โหลดไม่ได้ และแอปไม่ได้ใช้ฟีเจอร์ที่ต้อง cross-origin isolation
+const sha256Source = (text) => `'sha256-${crypto.createHash("sha256").update(text, "utf8").digest("base64")}'`;
+export const inlineStyleHashes = (html) =>
+  [...html.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/gi)].map((m) => sha256Source(m[1]));
+
+const cspDirectives = (styleHashes) => ({
+  defaultSrc: ["'self'"],
+  scriptSrc: ["'self'"],
+  styleSrc: ["'self'", ...styleHashes, "https://fonts.googleapis.com"],
+  fontSrc: ["'self'", "https://fonts.gstatic.com"],
+  imgSrc: ["'self'", "data:"],
+  connectSrc: ["'self'"],
+  objectSrc: ["'none'"],
+  baseUri: ["'self'"],
+  formAction: ["'self'"],
+  frameAncestors: ["'none'"],
+  // dev บน http://localhost ห้าม upgrade ไม่งั้นโหลด asset ไม่ได้
+  ...(config.cookieSecure ? { upgradeInsecureRequests: [] } : {}),
+});
+
+// <style> ใน frontend/index.html (กันหน้ากะพริบตอน redirect จาก Strava) — คำนวณ hash จากไฟล์ที่ build แล้วตอนเปิด server
+// แก้ index.html แล้ว build ใหม่ → restart backend ก็ได้ hash ใหม่เอง ไม่ต้องแก้โค้ดตรงนี้
+const indexStyleHashes = hasDist ? inlineStyleHashes(fs.readFileSync(path.join(distDir, "index.html"), "utf8")) : [];
+
 app.use(
   helmet({
-    contentSecurityPolicy: {
-      useDefaults: false,
-      directives: {
-        defaultSrc: ["'self'"],
-        scriptSrc: ["'self'"],
-        styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-        fontSrc: ["'self'", "https://fonts.gstatic.com"],
-        imgSrc: ["'self'", "data:"],
-        connectSrc: ["'self'"],
-        objectSrc: ["'none'"],
-        baseUri: ["'self'"],
-        formAction: ["'self'"],
-        frameAncestors: ["'none'"],
-        // dev บน http://localhost ห้าม upgrade ไม่งั้นโหลด asset ไม่ได้
-        ...(config.cookieSecure ? { upgradeInsecureRequests: [] } : {}),
-      },
-    },
+    contentSecurityPolicy: { useDefaults: false, directives: cspDirectives(indexStyleHashes) },
     frameguard: { action: "deny" },
     crossOriginEmbedderPolicy: false,
   }),
@@ -73,8 +84,14 @@ app.get("/health", (_req, res) => {
 });
 
 // รายการ endpoint — อยู่ที่ / ตอน dev, ย้ายไป /_api ตอนมีหน้าเว็บ (/ ถูกใช้เสิร์ฟ SPA)
-app.get(hasDist ? "/_api" : "/", (_req, res) => {
-  res.type("html").send(renderIndex());
+// หน้านี้มี <style> ของตัวเอง → ใช้ CSP ที่อนุญาต hash ของหน้านี้แทนของ index.html
+const apiIndexHtml = renderIndex();
+const apiIndexCsp = helmet.contentSecurityPolicy({
+  useDefaults: false,
+  directives: cspDirectives(inlineStyleHashes(apiIndexHtml)),
+});
+app.get(hasDist ? "/_api" : "/", apiIndexCsp, (_req, res) => {
+  res.type("html").send(apiIndexHtml);
 });
 
 app.use("/api/sensor", sensorRouter);

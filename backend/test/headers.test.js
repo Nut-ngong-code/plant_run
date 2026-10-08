@@ -3,7 +3,7 @@
 import request from "supertest";
 import { describe, expect, it } from "vitest";
 
-import { app } from "../src/app.js";
+import { app, hasDist, inlineStyleHashes } from "../src/app.js";
 
 describe("header ความปลอดภัย (ผลจาก OWASP ZAP)", () => {
   it("มี CSP / กัน iframe / nosniff / HSTS / Permissions-Policy / COOP และไม่บอกว่าใช้ Express", async () => {
@@ -19,6 +19,20 @@ describe("header ความปลอดภัย (ผลจาก OWASP ZAP)",
     expect(res.headers["permissions-policy"]).toContain("camera=()");
     expect(res.headers["cross-origin-opener-policy"]).toBe("same-origin");
     expect(res.headers["x-powered-by"]).toBeUndefined();
+  });
+
+  it("CSP ไม่ยอม inline style แบบเหมารวม ('unsafe-inline') — ZAP เตือนระดับ Medium", async () => {
+    const res = await request(app).get("/health");
+    expect(res.headers["content-security-policy"]).not.toContain("'unsafe-inline'");
+  });
+
+  it("หน้ารายการ API อนุญาตเฉพาะ <style> ของหน้านั้นเอง (ผ่าน hash)", async () => {
+    const res = await request(app).get(hasDist ? "/_api" : "/");
+    const hashes = inlineStyleHashes(res.text);
+    expect(hashes.length).toBeGreaterThan(0);
+    for (const h of hashes) expect(res.headers["content-security-policy"]).toContain(h);
+    // <style> ที่ไม่ได้เขียนไว้เอง (เช่นถูกฉีดเข้ามา) hash ไม่ตรง → ไม่อยู่ใน CSP
+    expect(res.headers["content-security-policy"]).not.toContain(inlineStyleHashes("<style>body{display:none}</style>")[0]);
   });
 
   it("CORS ตอบกลับเฉพาะโดเมนของเรา ไม่ใช่โดเมนที่ขอมา", async () => {
