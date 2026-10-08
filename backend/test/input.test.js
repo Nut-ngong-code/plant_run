@@ -41,6 +41,17 @@ describe("ตรวจข้อมูลขาเข้า (Zod)", () => {
     expect(await prisma.actionLog.count()).toBe(0);
   });
 
+  it("JSON ผิดรูปแบบ → 400 (ไม่ใช่ 500) และไม่หักแต้ม", async () => {
+    const res = await request(app)
+      .post("/api/action")
+      .set("Cookie", cookieFor(alice.id))
+      .set("Content-Type", "application/json")
+      .send('{"deviceId": "POT-A", bad json');
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe("Invalid JSON");
+    expect(await pointsOf(alice.id)).toBe(100);
+  });
+
   it("ค่าความชื้นเกิน 100% จากอุปกรณ์ → 400 ไม่บันทึก", async () => {
     const res = await request(app)
       .post("/api/sensor")

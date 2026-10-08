@@ -21,6 +21,10 @@ export const errorHandler = (err, _req, res, _next) => {
   if (err instanceof HttpError) {
     return res.status(err.status).json({ error: err.message, details: err.details });
   }
+  // error จาก express.json() เช่น JSON ผิดรูปแบบ (400) / body ใหญ่เกิน 1mb (413) — เป็นความผิดของคำขอ ไม่ใช่ของ server
+  if (err.expose && err.status >= 400 && err.status < 500) {
+    return res.status(err.status).json({ error: err.type === "entity.parse.failed" ? "Invalid JSON" : err.message });
+  }
   console.error("[unhandled]", err);
   res.status(500).json({ error: "Internal server error" });
 };
