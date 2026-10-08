@@ -45,7 +45,10 @@ export function History() {
       setActions(a);
       if (d.devices[0]) setSelectedDevice(d.devices[0].deviceId);
       setLoading(false);
-    })();
+    })().catch(() => {
+      // โหลดไม่สำเร็จ (เน็ตหลุด / server ล่ม) — หยุดสถานะกำลังโหลด ไม่ให้หน้าค้าง · 401 ถูกพาไปหน้า login แล้วใน api/client.js
+      if (!cancelled) setLoading(false);
+    });
     return () => {
       cancelled = true;
     };

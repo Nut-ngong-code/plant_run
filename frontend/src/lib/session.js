@@ -8,5 +8,9 @@ export const getUserId = () => {
   return Number.isInteger(n) && n > 0 ? n : null;
 };
 
-export const setUserId = (id) => localStorage.setItem(KEY, String(id));
+// เก็บเฉพาะเลขผู้ใช้ที่ถูกรูปแบบ (จำนวนเต็มบวก) — ไม่เขียนค่าอื่นลง localStorage
+export const setUserId = (id) => {
+  const n = Number(id);
+  if (Number.isInteger(n) && n > 0) localStorage.setItem(KEY, String(n));
+};
 export const clearUserId = () => localStorage.removeItem(KEY);

@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import express from "express";
 import cors from "cors";
 
+import { config } from "./lib/config.js";
 import { errorHandler, notFound } from "./middleware/error.js";
 
 import { sensorRouter } from "./routes/sensor.js";
@@ -24,7 +25,12 @@ const hasDist = fs.existsSync(path.join(distDir, "index.html"));
 // เทส (supertest) import ไฟล์นี้ไปยิง request ได้โดยไม่ต้องเปิดพอร์ตจริง · การเปิด server อยู่ใน index.js
 const app = express();
 
-app.use(cors());
+// ไม่บอกคนนอกว่าใช้ Express (header X-Powered-By) — ลดข้อมูลให้ผู้โจมตีเลือกช่องโหว่ตามเวอร์ชัน
+app.disable("x-powered-by");
+
+// CORS: ให้เฉพาะหน้าเว็บของเราเรียก API ข้ามโดเมนได้ (เดิม cors() เปิดให้ทุกเว็บ)
+// ปกติหน้าเว็บกับ API อยู่โดเมนเดียวกันอยู่แล้ว (Funnel / Vite proxy) ส่วน ESP32 ไม่เกี่ยวกับ CORS
+app.use(cors({ origin: config.frontendUrl, credentials: true }));
 app.use(express.json({ limit: "1mb" }));
 
 app.get("/health", (_req, res) => {
