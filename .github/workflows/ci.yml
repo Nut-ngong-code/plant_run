@@ -1,0 +1,122 @@
+# CI — ทุกครั้งที่ push เข้า main หรือเปิด PR
+#   backend:  เปิด MySQL → โหลด database/init.sql ลงฐาน plant_test → เทส 48 ข้อ + coverage → ส่งผลให้ SonarCloud
+#   frontend: build หน้าเว็บ (ถ้า build พัง จะรู้ก่อนเอาขึ้น VM)
+#   security: gitleaks สแกน secret ในประวัติ git ทั้งหมด · pnpm audit หา library ที่มีช่องโหว่
+# ไม่ได้ deploy อัตโนมัติ — ขึ้น VM ด้วยมือ (git pull → build → restart) ตามคู่มือ scripts/vbox-setup.md
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch: # กดรันเองได้จากแท็บ Actions
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Backend tests + SonarCloud
+    runs-on: ubuntu-latest
+    env:
+      # ฐานทดสอบชื่อลงท้าย _test — test/setup.js ไม่ยอมรันกับฐานอื่น
+      DATABASE_URL: mysql://plant_dev:devpassword123@127.0.0.1:3306/plant_test
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: rootpassword
+          MYSQL_DATABASE: plant_test
+          MYSQL_USER: plant_dev
+          MYSQL_PASSWORD: devpassword123
+        ports: ["3306:3306"]
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -prootpassword"
+          --health-interval=5s --health-timeout=5s --health-retries=20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # SonarCloud ใช้ประวัติ git แยก "โค้ดใหม่" ออกจากโค้ดเดิม
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: backend/pnpm-lock.yaml
+
+      - name: Load schema into plant_test
+        run: mysql -h 127.0.0.1 -uplant_dev -pdevpassword123 plant_test < database/init.sql
+
+      - name: Install
+        working-directory: backend
+        run: pnpm install --frozen-lockfile # postinstall = prisma generate
+
+      - name: Test + coverage
+        working-directory: backend
+        run: pnpm test
+
+      # vitest เขียน path ใน lcov เทียบกับโฟลเดอร์ backend (src/...) แต่ SonarCloud อ่านจาก root ของ repo
+      - name: Fix coverage paths for SonarCloud
+        run: sed -i 's#^SF:src/#SF:backend/src/#' backend/coverage/lcov.info
+
+      - name: SonarCloud scan
+        if: env.SONAR_TOKEN != '' # PR จาก fork ไม่มี secret — ข้ามไป ไม่ทำให้ CI แดง
+        uses: SonarSource/sonarqube-scan-action@v5
+
+  frontend:
+    name: Frontend build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - name: Install
+        working-directory: frontend
+        run: pnpm install --frozen-lockfile
+      - name: Build
+        working-directory: frontend
+        run: pnpm run build
+
+  security:
+    name: Secrets + dependency audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # สแกนทุก commit ไม่ใช่แค่ล่าสุด
+
+      - name: gitleaks (secret ที่หลุดเข้า git)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      # เฉพาะ library ที่รันจริงบน server/เบราว์เซอร์ (--prod) — ไม่นับเครื่องมือตอนพัฒนา (vite, vitest, ...)
+      # ล้มเฉพาะระดับ critical · ระดับอื่นแสดงในรายงานด้านล่างให้ตามแก้
+      - name: pnpm audit — backend
+        working-directory: backend
+        run: pnpm audit --prod --audit-level=critical
+      - name: pnpm audit — frontend
+        working-directory: frontend
+        run: pnpm audit --prod --audit-level=critical
+
+      - name: Full audit report (ไม่ทำให้ CI แดง)
+        if: always()
+        continue-on-error: true
+        run: |
+          (cd backend && pnpm audit --prod) || true
+          (cd frontend && pnpm audit --prod) || true
