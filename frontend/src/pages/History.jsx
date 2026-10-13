@@ -81,12 +81,12 @@ export function History() {
       <Header user={dashboard?.user} />
       <main className="max-w-6xl mx-auto px-4 py-8 space-y-6">
         <section className="animate-fade-up">
-          <span className="chip surface-flat text-forest-700">📊 STATS · 14 DAYS</span>
+          <span className="chip surface-flat text-forest-700">📊 STATS · OVERVIEW</span>
           <h1 className="mt-3 font-display text-3xl font-bold tracking-tight text-forest-900">
             HISTORY <span className="grad-text">&amp; GROWTH</span>
           </h1>
           <p className="text-sm text-forest-500 mt-2">
-            ข้อมูล 14 วันย้อนหลัง (กราฟ) + รายการทั้งหมด
+            สถิติสะสม + กราฟ 14 วันย้อนหลัง + รายการทั้งหมด
           </p>
         </section>
 
